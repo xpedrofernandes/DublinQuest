@@ -15,9 +15,9 @@ The manifest pins the four original Smart Dublin resources selected for DublinQu
 
 `data/sources.json` contains exact download/resource URLs, resource modification timestamps, SHA-256 checksums, publisher and catalogue licence fields. The catalogue's version fields are blank; the versions above describe the source filenames/notes, not invented release numbers. Recent metadata updates do not make the underlying data current. In particular the parks publisher explicitly says the 2016 mapping has not been updated.
 
-Raw files and full CKAN metadata responses are retained locally in ignored `data/raw/`. They are also excluded from Docker builds. Downloaded files were parsed as GeoJSON FeatureCollections or CSV with the required headers; none was an HTML error page. Canvas is structurally readable but is not valid UTF-8 GeoJSON as supplied.
+The four original data snapshots are bundled in `data/raw/` as third-party Dublin City Council open data, separate from the original DublinQuest application code. Their source licences apply independently of any application-code licence. The snapshots are unchanged, including known source defects, and included in Docker builds for future import commands. Full CKAN metadata dumps and any other files in that folder remain ignored and excluded from Docker builds. Downloaded files were parsed as GeoJSON FeatureCollections or CSV with the required headers; none was an HTML error page. Canvas is structurally readable but is not valid UTF-8 GeoJSON as supplied.
 
-From a clean clone, after creating the Phase 0 Docker environment:
+A fresh clone includes all four source files: no external dataset download is required. After creating the Phase 0 Docker environment, the existing script can verify their checksums locally and the inspection can be repeated:
 
 ```bash
 python3 scripts/download_datasets.py
@@ -27,7 +27,7 @@ docker compose run --rm --no-deps \
   web python /qualification.py /datasets > data/qualification.json
 ```
 
-The downloader uses Python's standard library and system `curl`; macOS supplies both in this development environment. Other machines need Python 3 and curl, or can download the exact manifest URLs manually. It checks hashes before writing and fails if a resource changes. Existing files are verified rather than overwritten. Preserve a private backup of these snapshots for the demonstration: a checksum records identity but cannot guarantee that an upstream server will retain the bytes forever.
+The verification script uses Python's standard library. With the bundled files present, it makes no network requests and does not need curl. If a file is missing, it can recover the exact snapshot using system `curl` with TLS verification. It checks hashes before writing and fails if a resource changes; existing files are verified rather than overwritten. Git attributes disable text/line-ending conversion for these four files to preserve the recorded bytes on macOS and Windows. Future dataset-specific import commands will read these local snapshots; those commands do not exist yet.
 
 The inspection script uses GeoDjango's GEOS/GDAL tools already in the web image. It reads mounted files only, transforms copies to EPSG:2157 for metric checks, and writes JSON to stdout. It does not access Django models, load a database or implement an ETL framework. Row references in the report are one-based data rows/features, excluding the CSV header. `data/qualification.json` is generated and ignored.
 
@@ -116,7 +116,9 @@ All four downloaded CKAN package responses identify Dublin City Council as the p
 
 Keep the supplied attribution, dataset title, publisher, resource link and licence link with each source. For Canvas also retain artist credits; for public art/heritage acknowledge the Dublin City Cultural Audit / Dublin City Council Culture Company context. Record modifications such as filtering, coordinate transformation, representative points and reviewed text corrections. The [CC BY 4.0 deed](https://creativecommons.org/licenses/by/4.0/) explains credit, licence linking and identification of changes; retain the actual supplied licence notice as well.
 
-Proposed attribution text: “Contains Dublin City Council open data from Smart Dublin: Dublin Canvas Public Art (2025), Public Artworks DCC (2021), Heritage Sites, Historic Monuments and Government Buildings (2024), and Parks and Open Spaces DCC (2016), published under Creative Commons Attribution. Data filtered and transformed for DublinQuest.” Link each title and the supplied licence notice in the eventual application. Do not imply endorsement. Dataset availability does not establish rights to download/rehost linked artwork photographs; no images were downloaded.
+The bundled raw snapshots are unmodified and have not yet been filtered or transformed. Attribution for these snapshots: “Dublin City Council open data via Smart Dublin: Dublin Canvas Public Art (2025), Public Artworks DCC (2021), Heritage Sites, Historic Monuments and Government Buildings (2024), and Parks and Open Spaces DCC (2016). Creative Commons Attribution.” The table above links each source; the publisher licence notice is retained above and in `data/sources.json`. Artist credits remain in the Canvas data. No photographs or external images are included.
+
+Proposed attribution text for the future processed application data: “Contains Dublin City Council open data from Smart Dublin: Dublin Canvas Public Art (2025), Public Artworks DCC (2021), Heritage Sites, Historic Monuments and Government Buildings (2024), and Parks and Open Spaces DCC (2016), published under Creative Commons Attribution. Data filtered and transformed for DublinQuest.” Link each title and the supplied licence notice in the eventual application. Do not imply endorsement. Dataset availability does not establish rights to download/rehost linked artwork photographs; no images were downloaded.
 
 ## Comparison and remaining checks
 

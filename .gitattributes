@@ -1,0 +1,5 @@
+# Preserve original dataset bytes across platforms, including CSV line endings.
+/data/raw/canvas.geojson -text
+/data/raw/public_art.csv -text
+/data/raw/heritage.geojson -text
+/data/raw/parks.geojson -text

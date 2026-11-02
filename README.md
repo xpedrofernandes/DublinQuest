@@ -126,4 +126,4 @@ Screenshots, data attribution, API documentation and the user guide will be adde
 
 ## Data sources
 
-The four Dublin open-data snapshots have been downloaded and inspected locally. See [DATA_SOURCES.md](DATA_SOURCES.md) for quality findings, attribution and reproduction commands, and [data/sources.json](data/sources.json) for exact resource URLs and SHA-256 checksums. Raw downloads stay outside Git. No attraction data has been imported yet.
+The repository includes four qualified, unmodified Dublin City Council dataset snapshots in `data/raw/` (3.27 MB total). They are third-party open data published under Creative Commons Attribution, separate from my original DublinQuest application code. See [DATA_SOURCES.md](DATA_SOURCES.md) for quality findings, attribution and reproduction commands, and [data/sources.json](data/sources.json) for exact resource URLs and SHA-256 checksums. A fresh clone includes the source files needed by the future import commands, without a separate dataset download. No attraction data has been imported yet; import commands will be added in a later phase. No photographs or external images are bundled.

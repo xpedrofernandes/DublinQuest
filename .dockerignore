@@ -38,5 +38,9 @@ build
 dist
 tmp
 temp
-data/raw
+data/raw/*
+!data/raw/canvas.geojson
+!data/raw/public_art.csv
+!data/raw/heritage.geojson
+!data/raw/parks.geojson
 data/qualification.json

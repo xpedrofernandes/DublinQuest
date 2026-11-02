@@ -61,6 +61,10 @@ Desktop.ini
 .idea/
 .vscode/
 
-# Original open-data snapshots and generated qualification output.
-/data/raw/
+# Track only the four qualified snapshots; keep metadata and other raw files local.
+/data/raw/*
+!/data/raw/canvas.geojson
+!/data/raw/public_art.csv
+!/data/raw/heritage.geojson
+!/data/raw/parks.geojson
 /data/qualification.json
