@@ -82,6 +82,13 @@ SESSION_COOKIE_SECURE = os.environ.get("HTTPS_ENABLED", "False").lower() == "tru
 CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticatedOrReadOnly"],
+    "EXCEPTION_HANDLER": "places.api_errors.api_exception_handler",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
-SPECTACULAR_SETTINGS = {"TITLE": "DublinQuest API", "VERSION": "0.1.0"}
+SPECTACULAR_SETTINGS = {
+    "TITLE": "DublinQuest API", "VERSION": "0.1.0",
+    "ENUM_NAME_OVERRIDES": {"PlaceCategoryEnum": [
+        ("street_art", "Street art"), ("public_art", "Public art and memorials"),
+        ("heritage", "Heritage and landmarks"), ("park", "Parks"),
+    ]},
+}

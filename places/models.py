@@ -20,7 +20,7 @@ class DatasetSource(models.Model):
 
 
 class Park(models.Model):
-    source = models.ForeignKey(DatasetSource, on_delete=models.PROTECT)
+    source = models.ForeignKey(DatasetSource, on_delete=models.PROTECT, null=True, blank=True)
     source_key = models.CharField(max_length=100)
     name = models.CharField(max_length=255)
     typology = models.CharField(max_length=100, blank=True)
@@ -44,7 +44,7 @@ class Place(models.Model):
         HERITAGE = "heritage", "Heritage and landmarks"
         PARK = "park", "Parks"
 
-    source = models.ForeignKey(DatasetSource, on_delete=models.PROTECT)
+    source = models.ForeignKey(DatasetSource, on_delete=models.PROTECT, null=True, blank=True)
     source_key = models.CharField(max_length=100)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)

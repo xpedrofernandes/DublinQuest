@@ -78,7 +78,7 @@ The root URL has no application page yet. `/health/` checks database connectivit
 - `docker/db/`: first-run SQL that creates a restricted application database role.
 - `static/`: source assets; collected output stays inside the web container.
 
-The initial spatial schema is implemented in `places` and `adventures`; see [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) for fields, relationships, CRS handling and database-backed test commands. Migrations are applied explicitly during setup. Dataset import commands are available below; application endpoints are still to be added.
+The initial spatial schema is implemented in `places` and `adventures`; see [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) for fields, relationships, CRS handling and database-backed test commands. Migrations are applied explicitly during setup. Dataset import commands are available below; the places/parks endpoints and spatial searches are documented in [API.md](API.md). Adventure endpoints and the map are still to be added.
 
 ## Containers and persistence
 
@@ -145,3 +145,8 @@ The CSV command explicitly declares WGS84 because its source metadata does not s
 Each command writes a JSON report containing counts and the outcome/reason for every source row. Reports are ignored by Git. The verified baseline is **314 Canvas places, 82 public artworks, 42 heritage places and 484 park boundaries with 484 representative places: 922 places overall**. See [DATA_SOURCES.md](DATA_SOURCES.md) for exclusions and quarantine reasons.
 
 Re-running these commands updates the same source-keyed records rather than creating duplicates. It also restores their imported fields and park representative points, so run imports deliberately if staff have edited imported records. Commands verify the pinned snapshot checksums and run atomically per dataset; they do not erase the database, remove unrelated records, or download/repair source data. Do not update the source manifest to bypass a checksum error without qualifying the changed dataset first.
+
+
+## Spatial API
+
+Public GeoJSON endpoints provide place/park listings, category filters, proximity searches, park containment and buffered-area intersection. Spatial writes require an active staff account and session CSRF protection. See [API.md](API.md) for endpoints, example requests, expected Dublin results and manual CRUD tests. Interactive API documentation is available at http://localhost:8000/api/docs/.

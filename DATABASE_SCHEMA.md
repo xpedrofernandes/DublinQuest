@@ -7,8 +7,8 @@ The initial schema is implemented in `places/models.py` and `adventures/models.p
 | Model | Main fields | Relationships and constraints |
 |---|---|---|
 | DatasetSource | Unique slug, title, publisher, resource URL, licence name/URL, attribution, snapshot filename, SHA-256 | Referenced source records protect their provenance from deletion |
-| Park | Name, typology, MultiPolygon boundary, active flag, timestamps | Source FK; unique `(source, source_key)` |
-| Place | Name, description, category, Point, artist, profile URL, active flag, timestamps | Source FK; unique `(source, source_key)`; optional one-to-one Park |
+| Park | Name, typology, MultiPolygon boundary, active flag, timestamps | Optional source FK (imported records retain provenance); unique `(source, source_key)` |
+| Place | Name, description, category, Point, artist, profile URL, active flag, timestamps | Optional source FK (imported records retain provenance); unique `(source, source_key)`; optional one-to-one Park |
 | Adventure | UUID primary key, guest owner UUID, title, start Point, radius, category list, requested stop count, search Polygon, sequence LineString, timestamps | Indexed owner UUID; radius 250–5000 metres; requested count 1–10 |
 | AdventureStop | Position, distance from start/previous stop in metres, visited timestamp | Adventure FK, Place FK; unique position and unique place per adventure; positive position and nonnegative distances |
 
@@ -48,4 +48,4 @@ docker compose run --rm web python manage.py makemigrations --check --dry-run
 
 The SQL script creates only the named test database if missing; it does not reset the application database. `--keepdb` reuses the prepared test database so Django does not need database-creation privileges. Never point the test database name at the application database.
 
-Verified against Docker/PostGIS: initial migrations apply from an empty test schema; coordinate round trips preserve longitude/latitude; Point, Polygon and LineString values round-trip; all five spatial indexes exist; source/stop uniqueness and radius constraints reject invalid writes; used places resist deletion; deleting adventures removes their stops. Model tests use clearly synthetic fixtures and roll back their records.
+Verified against Docker/PostGIS: initial migrations apply from an empty test schema; coordinate round trips preserve longitude/latitude; Point, Polygon and LineString values round-trip; all five spatial indexes exist; source/stop uniqueness and radius constraints reject invalid writes; used places resist deletion; deleting adventures removes their stops. Model/API tests use clearly synthetic fixtures and roll back their records. Migration `places.0002` permits null provenance on staff-created records instead of falsely assigning an external dataset publisher. API clients cannot change source links or keys; imported records and their four DatasetSources remain unchanged.
