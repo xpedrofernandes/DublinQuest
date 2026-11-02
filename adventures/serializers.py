@@ -1,3 +1,4 @@
+# Validate quest inputs and serialize geometry, stops and derived progress for the map.
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
 
@@ -8,6 +9,7 @@ from .models import Adventure, AdventureStop
 
 
 class AdventureInputSerializer(serializers.Serializer):
+    # Accept exploration criteria only; IDs, ownership and geometry are server-managed.
     title = serializers.CharField(max_length=120, default="Dublin adventure")
     lat = serializers.FloatField(min_value=-90, max_value=90)
     lng = serializers.FloatField(min_value=-180, max_value=180)
@@ -17,6 +19,7 @@ class AdventureInputSerializer(serializers.Serializer):
 
     def to_internal_value(self, data):
         reject_unknown(data, self.fields)
+        # Python booleans are numeric subclasses, but are not valid coordinates/counts.
         for key in ("lat", "lng", "radius_m", "stop_count"):
             if isinstance(data.get(key), bool):
                 raise serializers.ValidationError({key: "Provide a number, not a boolean."})
@@ -36,6 +39,7 @@ class AdventureInputSerializer(serializers.Serializer):
 
 
 class RegenerateSerializer(AdventureInputSerializer):
+    # The view supplies saved defaults; confirmation protects existing progress.
     lat = serializers.FloatField(min_value=-90, max_value=90, required=False)
     lng = serializers.FloatField(min_value=-180, max_value=180, required=False)
     categories = serializers.ListField(child=serializers.ChoiceField(choices=Place.Category.choices), min_length=1, max_length=4, required=False)
@@ -59,6 +63,7 @@ class StopProgressSerializer(serializers.Serializer):
 
 
 class AdventureStopSerializer(serializers.ModelSerializer):
+    # Embed destination details so the browser can render cards and markers together.
     place = PlaceSerializer(read_only=True)
     visited = serializers.SerializerMethodField()
 
@@ -89,6 +94,7 @@ class AdventureSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(ProgressSerializer)
     def get_progress(self, obj) -> dict:
+        # Derive progress from stop timestamps; an empty quest is not complete.
         stops = list(obj.stops.all())
         visited = sum(stop.visited_at is not None for stop in stops)
         return {"visited": visited, "total": len(stops),
@@ -100,6 +106,7 @@ class AdventureSerializer(serializers.ModelSerializer):
         return [f"Only {count} distinct eligible locations were available; {obj.requested_stops} were requested."] if count < obj.requested_stops else []
 
     def get_total_distance_m(self, obj) -> float:
+        # These are saved straight-line leg distances, not provider walking distance.
         return round(sum(stop.distance_from_previous_m for stop in obj.stops.all()), 2)
 
     def get_sequence_notice(self, obj) -> str:
@@ -127,6 +134,7 @@ class WalkingRouteSerializer(serializers.Serializer):
     route = serializers.JSONField(required=False)
     distance_m = serializers.FloatField(required=False)
     duration_s = serializers.FloatField(required=False)
+    # Vertex indices split the returned walking line without rerouting on visits.
     way_points = serializers.ListField(child=serializers.IntegerField(min_value=0), required=False)
     waypoints = serializers.ListField(child=serializers.DictField(), required=False)
     warnings = serializers.ListField(child=serializers.CharField(), required=False)

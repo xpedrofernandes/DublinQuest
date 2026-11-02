@@ -1,3 +1,4 @@
+# Check map/journey usability and responsive progress controls without external provider traffic.
 """Focused workspace usability checks. Uses the same optional Playwright setup as
 FRONTEND_TESTING.md; all routing and OSM tiles are mocked, never prefetched.
 """

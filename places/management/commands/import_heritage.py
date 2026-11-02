@@ -1,3 +1,4 @@
+# Import usable heritage points without repairing damaged text or unverified coordinates.
 import json
 
 from django.core.exceptions import ValidationError
@@ -21,6 +22,7 @@ class Command(BaseCommand):
             if not feature.get("geometry"):
                 report.append(entry(row, key, "skipped", "missing_coordinates"))
                 continue
+            # Retain known text/position concerns as quarantine outcomes, not guessed repairs.
             issue = text_issue(props)
             if issue or props["Title"] == "Trinity College Dublin":
                 report.append(entry(row, key, "quarantined", issue or "trinity_position_requires_verification"))

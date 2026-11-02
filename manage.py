@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# Load project settings before dispatching Django command-line operations.
 """Django management command entry point."""
 import os
 import sys

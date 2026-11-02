@@ -1,3 +1,4 @@
+# Verify readiness responses, allowed hosts and the rendered exploration page.
 from unittest.mock import patch
 
 from django.db import OperationalError

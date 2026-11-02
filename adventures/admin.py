@@ -1,1 +1,1 @@
-"""Admin registrations will accompany the domain models."""
+# Quest management is provided by session-owned REST endpoints rather than admin forms.

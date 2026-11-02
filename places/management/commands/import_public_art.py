@@ -1,3 +1,4 @@
+# Load the public-art CSV using an explicitly declared geographic coordinate interpretation.
 import csv
 import io
 
@@ -28,6 +29,7 @@ class Command(BaseCommand):
             if not props["Latitude"].strip() or not props["Longitude"].strip():
                 report.append(entry(row, key, "skipped", "missing_coordinates"))
                 continue
+            # Match full rows: repeated artwork names alone do not establish duplicates.
             fingerprint = tuple(sorted(props.items()))
             if fingerprint in seen:
                 report.append(entry(row, key, "skipped", "exact_duplicate_record"))

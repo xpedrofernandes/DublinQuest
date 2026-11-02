@@ -1,3 +1,4 @@
+# Permit staff-created records without assigning them a third-party dataset source.
 import django.db.models.deletion
 from django.db import migrations, models
 

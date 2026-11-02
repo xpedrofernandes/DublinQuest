@@ -1,3 +1,4 @@
+# Handle guest quest requests with owner filtering, CSRF and transactional updates.
 import uuid
 import time
 
@@ -29,6 +30,7 @@ OWNER_KEY = "adventure_owner"
 
 
 def guest_owner(request, create=False):
+    # Ownership comes from server-side session data, never a request field.
     value = request.session.get(OWNER_KEY)
     if value:
         return uuid.UUID(value)
@@ -44,6 +46,7 @@ def guest_owner(request, create=False):
 @authentication_classes([])
 @permission_classes([AllowAny])
 def guest_session(request):
+    # Establish the guest identity and give the browser a CSRF token for writes.
     guest_owner(request, create=True)
     response = Response({"csrfToken": get_token(request._request)})
     patch_cache_control(response, private=True, no_store=True)
@@ -68,10 +71,13 @@ class AdventureViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
             return Adventure.objects.none()
+        # Filter before object lookup so another guest's UUID also returns 404.
         owner = guest_owner(self.request)
         queryset = Adventure.objects.filter(owner_uuid=owner) if owner else Adventure.objects.none()
         if self.action in ("update", "partial_update", "destroy", "regenerate", "stop"):
+            # Serialize changes to this quest within the mutation transaction.
             queryset = queryset.select_for_update()
+        # Fetch ordered stops and their source details without per-stop queries.
         return queryset.prefetch_related(Prefetch("stops", queryset=AdventureStop.objects.select_related("place__source", "place__park").order_by("position")))
 
     def get_serializer_class(self):
@@ -82,6 +88,7 @@ class AdventureViewSet(viewsets.ModelViewSet):
         return AdventureSerializer
 
     def finalize_response(self, request, response, *args, **kwargs):
+        # Guest-specific responses must not be shared by browser/proxy caches.
         response = super().finalize_response(request, response, *args, **kwargs)
         patch_cache_control(response, private=True, no_store=True)
         return response
@@ -100,6 +107,7 @@ class AdventureViewSet(viewsets.ModelViewSet):
         return self.get_paginated_response(AdventureSerializer(page, many=True).data)
 
     def store_generation(self, adventure, values, start):
+        # Callers wrap geometry and stop replacement in one atomic transaction.
         generated = generate_adventure(start, values["categories"], values["radius_m"], values["stop_count"])
         adventure.title = values["title"]
         adventure.start = start
@@ -110,6 +118,7 @@ class AdventureViewSet(viewsets.ModelViewSet):
         try:
             adventure.full_clean()
             adventure.save()
+            # Regeneration replaces the old sequence and its visited timestamps.
             adventure.stops.all().delete()
             for position, stop in enumerate(generated["stops"], 1):
                 record = AdventureStop(adventure=adventure, position=position, **stop)
@@ -148,6 +157,7 @@ class AdventureViewSet(viewsets.ModelViewSet):
         start = adventure.start.clone()
         geographic = start.clone()
         geographic.transform(4326)
+        # Merge edits with saved criteria so omitted fields retain their values.
         defaults = {"title": adventure.title, "lat": geographic.y, "lng": geographic.x,
             "radius_m": adventure.radius_m, "categories": adventure.categories,
             "stop_count": adventure.requested_stops}
@@ -168,6 +178,7 @@ class AdventureViewSet(viewsets.ModelViewSet):
         serializer = StopProgressSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         stop = get_object_or_404(adventure.stops, pk=stop_id)
+        # Repeated visited updates retain the original self-reported timestamp.
         if serializer.validated_data["visited"]:
             if stop.visited_at is None:
                 stop.visited_at = timezone.now()
@@ -194,6 +205,7 @@ class AdventureViewSet(viewsets.ModelViewSet):
         if any(abs(stop.place.point.x - xy[0]) > .001 or abs(stop.place.point.y - xy[1]) > .001
                 for stop, xy in zip(stops, adventure.path.coords[1:])):
             return Response(unavailable("An attraction has moved in the data; regenerate the adventure first."))
+        # Limit provider requests per session; frontend progress uses cached routes.
         now = time.time()
         if now - request.session.get("walking_route_requested_at", 0) < 30:
             return Response(unavailable("Please wait 30 seconds between walking-route requests."))

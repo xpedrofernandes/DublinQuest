@@ -1,3 +1,4 @@
+# Share snapshot verification, geometry validation and import reporting across datasets.
 """Small shared checks for the four dataset-specific management commands."""
 import hashlib
 import json

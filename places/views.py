@@ -1,3 +1,4 @@
+# Expose public spatial searches and validated staff CRUD with park-point synchronization.
 import json
 import uuid
 
@@ -30,6 +31,7 @@ class PlaceViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "put", "patch", "delete", "head", "options"]
 
     def get_serializer_class(self):
+        # Writes accept a limited input shape; reads return attributed GeoJSON.
         if self.action in ("create", "update", "partial_update"):
             return PlaceWriteSerializer
         return PlaceSerializer
@@ -80,6 +82,7 @@ class PlaceViewSet(viewsets.ModelViewSet):
             raise serializers.ValidationError({"detail": "Manage park representative places through the parks API."})
         serializer = PlaceWriteSerializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
+        # New staff records get their own key and no invented external provenance.
         extra = {"source_key": f"staff:{uuid.uuid4()}"} if instance is None else {}
         obj = serializer.save(**extra)
         return Response(PlaceSerializer(obj).data, status=status.HTTP_201_CREATED if instance is None else status.HTTP_200_OK)
@@ -92,6 +95,7 @@ class PlaceViewSet(viewsets.ModelViewSet):
             with transaction.atomic():
                 obj.delete()
         except ProtectedError:
+            # Keep saved quests valid rather than deleting their referenced destination.
             return Response({"detail": "This place is used by a saved adventure."}, status=409)
         return Response(status=204)
 
@@ -133,6 +137,7 @@ class ParkViewSet(viewsets.ModelViewSet):
     def places(self, request, pk=None, **kwargs):
         park = self.get_object()
         options = validate_query(request, PlaceQuerySerializer).validated_data
+        # Exclude derived park points so containment finds attractions, not the park itself.
         queryset = Place.objects.filter(active=True).exclude(category="park").select_related("source", "park")
         if options.get("categories"):
             queryset = queryset.filter(category__in=options["categories"])
@@ -154,6 +159,7 @@ class ParkViewSet(viewsets.ModelViewSet):
         if query.validated_data.get("search"):
             queryset = queryset.filter(name__icontains=query.validated_data["search"])
         response = self.collection(intersecting_parks(queryset, area))
+        # Only the response copy uses longitude/latitude; filtering stays in metres.
         area.transform(4326)
         response.data["search_area"] = json.loads(area.geojson)
         return response
@@ -172,11 +178,13 @@ class ParkViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         extra = {"source_key": f"staff:{uuid.uuid4()}"} if instance is None else {}
         park = serializer.save(**extra)
+        # Save the boundary and its derived destination together in this transaction.
         place = Place.objects.filter(park=park).first()
         if place is None:
             place = Place(park=park, source=park.source, source_key=park.source_key, category="park",
                 description="Representative point within the park boundary; not a verified entrance.")
         place.name, place.active = park.name, park.active
+        # Point-on-surface lies inside the boundary; it is not a verified entrance.
         place.point = park.boundary.point_on_surface
         try:
             place.full_clean()

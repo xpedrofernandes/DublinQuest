@@ -1,3 +1,4 @@
+# Check projected quest geometry, model validation and database deletion constraints.
 import uuid
 
 from django.contrib.gis.geos import LineString, Point
@@ -12,6 +13,7 @@ from places.models import DatasetSource, Place
 
 class AdventureModelTests(TestCase):
     def setUp(self):
+        # Synthetic metric fixtures keep database rules independent of real datasets.
         self.origin = Point(715000, 734000, srid=2157)
         self.adventure = Adventure.objects.create(
             owner_uuid=uuid.uuid4(), title="Synthetic test adventure", start=self.origin,

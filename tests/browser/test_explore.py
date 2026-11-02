@@ -1,3 +1,4 @@
+# Drive the full guest UI in Chrome with mocked tiles and routing, cleaning up test quests.
 """Optional real-browser smoke test against a populated local Docker application.
 
 Requires Playwright only in the test runner's Python environment, not the app.

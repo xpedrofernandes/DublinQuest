@@ -1,3 +1,4 @@
+# Request an optional pedestrian overlay while keeping stored quest geometry unchanged.
 """Optional ORS request; never changes the adventure or its stored geometry."""
 import json
 import math
@@ -26,6 +27,7 @@ def walking_route(path):
     key = settings.ORS_API_KEY.strip()
     if not key:
         return unavailable("Walking routing is not configured.")
+    # Transform a clone so the stored/projected sequence is never mutated.
     coordinates = list(path.transform(4326, clone=True).coords)
     payload = {"coordinates": coordinates, "instructions": False, "units": "m",
         "radiuses": [MAX_SNAP_M] * len(coordinates)}
@@ -35,6 +37,7 @@ def walking_route(path):
     })
     try:
         with urllib.request.build_opener(NoRedirect()).open(request, timeout=10) as response:
+            # Read one byte beyond the limit to detect oversized provider responses.
             raw = response.read(2_000_001)
         if len(raw) > 2_000_000 or key.encode() in raw:
             raise ValueError("Rejected response")
@@ -62,6 +65,7 @@ def walking_route(path):
         for value in (distance, duration):
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
                 raise ValueError("Invalid summary")
+        # Require an ordered vertex index for the origin and every requested stop.
         indices = properties["way_points"]
         if (not isinstance(indices, list) or len(indices) != len(coordinates)
                 or any(type(i) is not int or not 0 <= i < len(points) for i in indices)
@@ -72,6 +76,7 @@ def walking_route(path):
             snapped = points[index]
             source = Point(*original, srid=4326).transform(2157, clone=True)
             target = Point(*snapped, srid=4326).transform(2157, clone=True)
+            # Measure snapping in projected metres; keep attraction markers unchanged.
             displacement = source.distance(target)
             if not math.isfinite(displacement) or displacement > MAX_SNAP_M + 1:
                 raise ValueError("Snapping exceeds requested tolerance")

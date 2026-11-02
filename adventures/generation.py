@@ -1,3 +1,4 @@
+# Select real nearby destinations and build their deterministic straight-line sequence.
 """Small deterministic selection algorithm; no walking or routing engine."""
 from django.contrib.gis.geos import LineString
 from rest_framework.exceptions import ValidationError

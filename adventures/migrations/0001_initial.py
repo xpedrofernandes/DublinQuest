@@ -1,3 +1,4 @@
+# Create quest geometry, ordered stops and integrity constraints; preserve migration operations.
 import django.contrib.gis.db.models.fields
 import django.core.validators
 import django.db.models.deletion

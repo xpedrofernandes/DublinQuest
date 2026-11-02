@@ -1,3 +1,4 @@
+# Require CSRF protection for guest mutations even when no user is logged in.
 from rest_framework.authentication import SessionAuthentication
 
 

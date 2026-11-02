@@ -1,3 +1,4 @@
+# Test spatial query boundaries, GeoJSON responses, validation and staff-only CRUD.
 import json
 import uuid
 
@@ -14,6 +15,7 @@ from places.models import Park, Place
 
 class SpatialAPITests(APITestCase):
     def setUp(self):
+        # Offset synthetic features in metres to test inside, boundary and outside cases.
         self.origin = Point(-6.26, 53.35, srid=4326)
         self.origin.transform(2157)
         self.x, self.y = self.origin.coords

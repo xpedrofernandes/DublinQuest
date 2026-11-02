@@ -1,3 +1,4 @@
+# Enforce nonempty, valid EPSG:2157 geometry before application code saves it.
 from django.core.exceptions import ValidationError
 
 

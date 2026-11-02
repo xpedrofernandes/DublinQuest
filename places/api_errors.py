@@ -1,3 +1,4 @@
+# Translate database conflicts into safe API responses while retaining DRF error handling.
 from django.db import IntegrityError
 from rest_framework.response import Response
 from rest_framework.views import exception_handler

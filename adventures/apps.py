@@ -1,3 +1,4 @@
+# Django app registration for the adventure models and API.
 from django.apps import AppConfig
 
 

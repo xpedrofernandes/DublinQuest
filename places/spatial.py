@@ -1,3 +1,4 @@
+# Provide the three reusable PostGIS searches and their projected search-area buffer.
 """The three independently callable PostGIS operations used by the map APIs."""
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.geos import GEOSGeometry

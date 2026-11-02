@@ -1,3 +1,4 @@
+# Register the places app and its default database primary-key type with Django.
 from django.apps import AppConfig
 
 

@@ -1,3 +1,4 @@
+# Mock the routing provider to test geometry validation, security and safe fallback.
 """Routing tests never contact the external provider."""
 import copy
 import io

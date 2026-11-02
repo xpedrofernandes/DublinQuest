@@ -1,3 +1,4 @@
+# Optionally retrieve missing snapshots and verify their pinned contents before writing them.
 """Download the qualified snapshots without modifying or importing their contents.
 
 Uses curl (included in macOS) for normal TLS verification. A checksum mismatch
@@ -35,6 +36,7 @@ def main():
     destination.mkdir(parents=True, exist_ok=True)
     for source in json.loads((ROOT / 'data' / 'sources.json').read_text()):
         path = destination / source['filename']
+        # Existing bundled files are checked locally; download only a missing snapshot.
         if path.exists():
             body = path.read_bytes()
         else:

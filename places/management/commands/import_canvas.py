@@ -1,3 +1,4 @@
+# Import qualified current Canvas artworks and report excluded or ambiguous source rows.
 import json
 from collections import defaultdict
 
@@ -11,6 +12,7 @@ from places.import_helpers import entry, finish, geojson_features, load_snapshot
 class Command(BaseCommand):
     help = "Import current, named DCC Canvas artworks from the pinned 2025 snapshot."
 
+    # Unexpected failures roll back this entire dataset; deliberate exclusions are reported.
     @transaction.atomic
     def handle(self, *args, **options):
         metadata, raw = load_snapshot("canvas")
@@ -43,6 +45,7 @@ class Command(BaseCommand):
                 continue
             seen.add(fingerprint)
             candidates.append((row, key, props, geometry))
+        # Distinct current artworks sharing a point are ambiguous; do not choose one silently.
         by_point = defaultdict(list)
         for item in candidates:
             by_point[json.dumps(item[3], sort_keys=True)].append(item)

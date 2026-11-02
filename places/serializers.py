@@ -1,3 +1,4 @@
+# Validate API fields and convert between geographic GeoJSON and projected model geometry.
 import copy
 import json
 import math

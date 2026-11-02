@@ -1,3 +1,4 @@
+# Allow public reads while reserving spatial-data mutations for active staff users.
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 

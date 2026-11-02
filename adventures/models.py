@@ -1,3 +1,4 @@
+# Store session-owned quests and their ordered stops in the projected spatial database.
 import uuid
 
 from django.contrib.gis.db import models
@@ -10,6 +11,7 @@ from places.validators import validate_geometry
 
 class Adventure(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    # Matches the identity in the database-backed guest session, not an auth user.
     owner_uuid = models.UUIDField(db_index=True, editable=False)
     title = models.CharField(max_length=120)
     start = models.PointField(srid=2157, spatial_index=True, validators=[validate_geometry])
@@ -30,6 +32,7 @@ class Adventure(models.Model):
         ]
 
     def clean(self):
+        # JSONField alone does not enforce supported, distinct category values.
         super().clean()
         if (not isinstance(self.categories, list) or not self.categories
                 or any(not isinstance(item, str) or item not in Place.Category.values for item in self.categories)
@@ -41,6 +44,7 @@ class Adventure(models.Model):
 
 
 class AdventureStop(models.Model):
+    # Quest deletion removes its stops; referenced source places remain protected.
     adventure = models.ForeignKey(Adventure, on_delete=models.CASCADE, related_name="stops")
     place = models.ForeignKey(Place, on_delete=models.PROTECT, related_name="adventure_stops")
     position = models.PositiveSmallIntegerField(validators=[MinValueValidator(1)])
@@ -50,6 +54,7 @@ class AdventureStop(models.Model):
 
     class Meta:
         ordering = ["position"]
+        # Enforce one destination per quest and one stop at each sequence position.
         constraints = [
             models.UniqueConstraint(fields=["adventure", "position"], name="stop_position_unique"),
             models.UniqueConstraint(fields=["adventure", "place"], name="stop_place_unique"),

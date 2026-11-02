@@ -1,3 +1,4 @@
+# Combine page views, REST resources, authentication and API documentation routes.
 from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
@@ -8,6 +9,7 @@ from places.views import ParkViewSet, PlaceViewSet
 
 from .views import explore, health
 
+# Generate standard collection/detail routes plus each viewset's custom actions.
 router = DefaultRouter()
 router.register("places", PlaceViewSet)
 router.register("parks", ParkViewSet)

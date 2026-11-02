@@ -1,3 +1,4 @@
+# Define spatial attractions, park boundaries and the provenance of imported records.
 from django.contrib.gis.db import models
 from django.core.validators import RegexValidator
 
@@ -5,6 +6,7 @@ from .validators import validate_geometry
 
 
 class DatasetSource(models.Model):
+    # Retain attribution and snapshot identity independently of imported features.
     slug = models.SlugField(unique=True)
     title = models.CharField(max_length=255)
     publisher = models.CharField(max_length=255)
@@ -24,6 +26,7 @@ class Park(models.Model):
     source_key = models.CharField(max_length=100)
     name = models.CharField(max_length=255)
     typology = models.CharField(max_length=100, blank=True)
+    # Projected metre units support distance/buffer queries; GiST is created by GeoDjango.
     boundary = models.MultiPolygonField(srid=2157, spatial_index=True, validators=[validate_geometry])
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -52,12 +55,14 @@ class Place(models.Model):
     point = models.PointField(srid=2157, spatial_index=True, validators=[validate_geometry])
     artist = models.CharField(max_length=255, blank=True)
     profile_url = models.URLField(max_length=1000, blank=True)
+    # Only category=park uses this link to a boundary-derived representative point.
     park = models.OneToOneField(Park, on_delete=models.CASCADE, null=True, blank=True, related_name="place")
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        # Source keys are unique within a dataset, not globally by attraction name.
         constraints = [
             models.UniqueConstraint(fields=["source", "source_key"], name="place_source_key_unique"),
             models.CheckConstraint(condition=models.Q(category__in=["street_art", "public_art", "heritage", "park"]), name="place_category_valid"),

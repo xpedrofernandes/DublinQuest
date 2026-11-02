@@ -1,3 +1,4 @@
+# Inspect source quality and spatial coverage without altering snapshots or database records.
 """Read-only inspection of the four source snapshots using the taught GEOS tools.
 
 Run inside the web image with a read-only dataset mount; no Django/database writes.
@@ -16,6 +17,7 @@ from django.contrib.gis.geos import GEOSGeometry, Point
 
 
 def duplicates(values):
+    # Return source row groups so suspected duplicates can be reviewed in context.
     grouped = defaultdict(list)
     for row, value in values:
         if value not in (None, ''):
@@ -56,6 +58,7 @@ def inspect(folder):
                 except (ValueError, TypeError):
                     geometries.append(None)
             crs = 'No embedded CRS: named latitude/longitude columns; WGS84 interpretation requires catalogue corroboration'
+        # Record field completeness separately from geometric validity.
         fields = sorted(set().union(*(r.keys() for r in rows)))
         missing = {key: sum(r.get(key) is None or str(r.get(key)).strip() == '' for r in rows) for key in fields}
         types = Counter()
@@ -76,6 +79,7 @@ def inspect(folder):
                 bounds.append(extent)
                 if not geom.valid:
                     invalid.append({'row': index, 'name': row.get(name_field), 'reason': geom.valid_reason})
+                # Normalize only this inspection copy to compare equivalent geometries.
                 geom.normalize()
                 geometry_keys.append((index, geom.wkb.hex()))
                 geom.transform(2157)
@@ -87,6 +91,7 @@ def inspect(folder):
                     points.append((name, index, title, geom, row))
             except (ValueError, TypeError) as error:
                 invalid.append({'row': index, 'reason': str(error)})
+        # Project the illustrative centre before measuring candidate coverage in metres.
         center = Point(-6.26, 53.35, srid=4326)
         center.transform(2157)
         nearby = {str(radius): sum(geom.distance(center) <= radius for _, geom in projected) for radius in (500, 1000, 2000, 5000)}

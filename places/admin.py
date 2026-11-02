@@ -1,1 +1,1 @@
-"""Admin registrations will accompany the domain models."""
+# Staff manage spatial records through the authenticated DRF browsable API.

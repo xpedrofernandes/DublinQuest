@@ -1,3 +1,4 @@
+# Exercise quest generation, ownership, CSRF and persistence in an isolated test database.
 import io
 import uuid
 
@@ -15,6 +16,7 @@ from places.models import DatasetSource, Park, Place
 
 class AdventureAPITests(APITestCase):
     def setUp(self):
+        # Enforce CSRF in tests so anonymous guest writes exercise real protection.
         self.client = APIClient(enforce_csrf_checks=True)
         self.token = self.bootstrap(self.client)
         self.origin = Point(-6.26, 53.35, srid=4326)

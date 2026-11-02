@@ -1,3 +1,4 @@
+# Paginate spatial results without changing the GeoJSON FeatureCollection contract.
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 

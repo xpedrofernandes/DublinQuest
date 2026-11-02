@@ -1,3 +1,4 @@
+# Check source uniqueness, geometry validation, coordinate round trips and GiST indexes.
 from django.contrib.gis.geos import MultiPolygon, Point, Polygon
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction

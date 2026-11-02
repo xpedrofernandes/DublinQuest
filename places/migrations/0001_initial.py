@@ -1,3 +1,4 @@
+# Create source provenance, park boundaries, attraction points and their integrity constraints.
 import django.contrib.gis.db.models.fields
 import django.core.validators
 import django.db.models.deletion

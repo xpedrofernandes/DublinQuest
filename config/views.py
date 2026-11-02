@@ -1,3 +1,4 @@
+# Render the exploration page and expose a database-backed readiness endpoint.
 import logging
 
 from django.db import DatabaseError, connection

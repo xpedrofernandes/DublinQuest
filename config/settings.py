@@ -1,8 +1,10 @@
+# Configure the container environment, spatial backend, middleware and application security.
 """Environment-based settings for the containerised DublinQuest application."""
 import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+# Required secrets fail fast when missing; optional routing can remain unconfigured.
 SECRET_KEY = os.environ["SECRET_KEY"]
 ORS_API_KEY = os.environ.get("ORS_API_KEY", "")
 DEBUG = os.environ.get("DEBUG", "False").lower() == "true"
@@ -23,6 +25,7 @@ INSTALLED_APPS = [
     "places",
     "adventures",
 ]
+# Sessions must be loaded before authentication and guest ownership checks.
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -68,11 +71,13 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+# WhiteNoise serves versioned, collected static assets from the Gunicorn container.
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+# Persist guest identity across requests and container restarts using Postgres sessions.
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"

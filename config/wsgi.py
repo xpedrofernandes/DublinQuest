@@ -1,3 +1,4 @@
+# Expose the Django WSGI application that Gunicorn loads in the web container.
 import os
 from django.core.wsgi import get_wsgi_application
 

@@ -1,3 +1,4 @@
+# Load bundled snapshots into the test database to check repeatability and quarantine decisions.
 import io
 import json
 from pathlib import Path
@@ -30,6 +31,7 @@ class DatasetImportTests(TestCase):
             self.assertEqual(report["created"], counts[1])
             self.assertEqual({row["row"] for row in report["records"]}, set(range(1, counts[0] + 1)))
             self.assertTrue(all(row["reason"] for row in report["records"]))
+        # A second full run must preserve primary keys, outcomes and record counts.
         before = list(Place.objects.order_by("pk").values_list("pk", "source_id", "source_key"))
         park_ids = list(Park.objects.order_by("pk").values_list("pk", flat=True))
         for name in expected:

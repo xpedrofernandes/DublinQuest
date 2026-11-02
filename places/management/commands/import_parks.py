@@ -1,3 +1,4 @@
+# Load valid park boundaries together with synchronized representative destination points.
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -46,6 +47,7 @@ class Command(BaseCommand):
                     park.active = True
                     park.full_clean()
                     park.save()
+                    # Regenerate the representative from the same accepted boundary on every rerun.
                     place_created = save_place(source, key, name=park.name, category="park",
                         description="Representative point within the source park boundary; not a verified entrance.",
                         park=park, point=boundary.point_on_surface, active=True)
