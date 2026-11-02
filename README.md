@@ -78,7 +78,7 @@ The root URL has no application page yet. `/health/` checks database connectivit
 - `docker/db/`: first-run SQL that creates a restricted application database role.
 - `static/`: source assets; collected output stays inside the web container.
 
-The apps currently have no domain models. Django's built-in authentication, administration and session migrations are applied explicitly during setup.
+The initial spatial schema is implemented in `places` and `adventures`; see [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) for fields, relationships, CRS handling and database-backed test commands. Migrations are applied explicitly during setup. Dataset import commands and application endpoints are still to be added.
 
 ## Containers and persistence
 
