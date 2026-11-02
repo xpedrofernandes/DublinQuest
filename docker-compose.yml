@@ -30,6 +30,7 @@ services:
       SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY}
       DEBUG: ${DJANGO_DEBUG:-False}
       ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,web}
+      ORS_API_KEY: ${ORS_API_KEY:-}
     ports: ['127.0.0.1:8000:8000']
     depends_on:
       db:
