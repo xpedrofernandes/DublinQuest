@@ -3,6 +3,8 @@ from rest_framework.response import Response
 
 
 class GeoJSONPagination(PageNumberPagination):
+    """Add page metadata while retaining Leaflet-compatible GeoJSON."""
+
     page_size = 50
     page_size_query_param = "page_size"
     max_page_size = 100
@@ -14,6 +16,7 @@ class GeoJSONPagination(PageNumberPagination):
             "features": data["features"]})
 
     def get_paginated_response_schema(self, schema):
+        # Keep the generated API documentation consistent with the response above.
         features = schema.get("properties", {}).get("features", schema)
         if "$ref" in schema and schema["$ref"].endswith("List"):
             # DRF GIS documents its list serializer as a FeatureCollection.

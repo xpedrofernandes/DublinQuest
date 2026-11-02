@@ -16,6 +16,7 @@ from .models import DatasetSource, Park, Place
 
 
 def reject_unknown(data, allowed):
+    """Reject unexpected fields, including attempts to set server-owned values."""
     if not isinstance(data, Mapping):
         raise serializers.ValidationError({"detail": "Expected a JSON object."})
     unknown = set(data) - set(allowed)
@@ -37,6 +38,7 @@ class WGS84GeometryField(GeometryField):
         if not isinstance(value, dict) or set(value) != {"type", "coordinates"} or value.get("type") != self.geometry_type:
             raise serializers.ValidationError(f"Provide a {self.geometry_type} GeoJSON geometry with type and coordinates only.")
 
+        # Recursion handles both a Point pair and nested MultiPolygon rings.
         def check_coordinates(coordinates):
             if not isinstance(coordinates, list) or not coordinates:
                 raise serializers.ValidationError("Coordinates must be nonempty arrays.")
@@ -51,6 +53,7 @@ class WGS84GeometryField(GeometryField):
             geometry = GEOSGeometry(json.dumps(value, allow_nan=False), srid=4326)
             if geometry.empty or not geometry.valid:
                 raise serializers.ValidationError("Geometry must be nonempty and valid; no automatic repair is performed.")
+            # Keep database queries in the projected CRS used by spatial indexes.
             geometry.transform(2157)
         except (GEOSException, GDALException, ValueError, TypeError) as error:
             raise serializers.ValidationError("Invalid GeoJSON geometry.") from error
@@ -60,6 +63,8 @@ class WGS84GeometryField(GeometryField):
 
 
 class SourceSerializer(serializers.ModelSerializer):
+    """Expose dataset attribution alongside imported spatial records."""
+
     class Meta:
         model = DatasetSource
         fields = ["id", "slug", "title", "publisher", "resource_url", "licence_name", "licence_url", "attribution", "sha256"]
@@ -71,6 +76,7 @@ class PlaceSerializer(GeoFeatureModelSerializer):
     distance_m = serializers.SerializerMethodField()
 
     def get_distance_m(self, obj) -> float | None:
+        # Only proximity queries annotate distance; ordinary listings return null.
         distance = getattr(obj, "distance", None)
         return round(distance.m, 2) if distance is not None else None
 
@@ -91,6 +97,7 @@ class ParkSerializer(GeoFeatureModelSerializer):
 
 
 class PlaceWriteSerializer(serializers.ModelSerializer):
+    # Provenance, source keys and park links are managed by server-side code.
     point = WGS84GeometryField("Point")
 
     class Meta:
@@ -102,6 +109,7 @@ class PlaceWriteSerializer(serializers.ModelSerializer):
         return super().to_internal_value(data)
 
     def validate(self, attrs):
+        # Merge partial updates into a copy without mutating the live instance.
         candidate = copy.copy(self.instance) if self.instance else Place(source_key="staff:pending")
         for key, value in attrs.items():
             setattr(candidate, key, value)
@@ -115,6 +123,8 @@ class PlaceWriteSerializer(serializers.ModelSerializer):
 
 
 class ParkWriteSerializer(serializers.ModelSerializer):
+    """Validate writable boundaries; the view synchronizes the park's Place."""
+
     boundary = WGS84GeometryField("MultiPolygon")
 
     class Meta:
@@ -126,6 +136,7 @@ class ParkWriteSerializer(serializers.ModelSerializer):
         return super().to_internal_value(data)
 
     def validate(self, attrs):
+        # Validate the complete model even when PATCH supplies only some fields.
         candidate = copy.copy(self.instance) if self.instance else Park(source_key="staff:pending")
         for key, value in attrs.items():
             setattr(candidate, key, value)
@@ -159,6 +170,7 @@ class NearbyQuerySerializer(PlaceQuerySerializer):
         return attrs
 
     def origin(self):
+        # GEOS takes longitude first; EPSG:2157 makes radius comparisons metric.
         origin = Point(self.validated_data["lng"], self.validated_data["lat"], srid=4326)
         try:
             origin.transform(2157)
@@ -176,6 +188,7 @@ class ParkQuerySerializer(serializers.Serializer):
 
 
 def validate_query(request, serializer_class):
+    # Allow DRF's format option, but reject unknown or repeated filter parameters.
     allowed = {*serializer_class().fields, "format"}
     reject_unknown(request.query_params, allowed)
     data = {}
@@ -185,6 +198,7 @@ def validate_query(request, serializer_class):
         if key != "format":
             data[key] = request.query_params[key]
     if "categories" in data:
+        # URL filters use comma-separated text; the serializer expects a list.
         data["categories"] = data["categories"].split(",")
     serializer = serializer_class(data=data)
     serializer.is_valid(raise_exception=True)

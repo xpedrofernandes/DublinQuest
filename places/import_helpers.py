@@ -13,6 +13,7 @@ from .models import DatasetSource, Place
 
 
 def load_snapshot(slug):
+    # Import rules apply to these exact qualified bytes, not an updated download.
     manifest = json.loads((settings.BASE_DIR / "data/sources.json").read_text())
     source = next(item for item in manifest if item["name"] == slug)
     raw = (settings.BASE_DIR / "data/raw" / source["filename"]).read_bytes()
@@ -22,6 +23,7 @@ def load_snapshot(slug):
 
 
 def source_record(metadata):
+    # Reuse provenance on repeat imports instead of creating another source row.
     source, _ = DatasetSource.objects.update_or_create(
         slug=metadata["name"], defaults={
             "title": metadata["title"], "publisher": metadata["organization"],
@@ -43,6 +45,7 @@ def geojson_features(raw):
 
 
 def text_issue(properties):
+    """Flag undecodable or suspicious text for review rather than repairing it."""
     for value in properties.values():
         if not isinstance(value, str):
             continue
@@ -54,6 +57,7 @@ def text_issue(properties):
 
 
 def projected_geometry(geometry, expected_type):
+    """Validate source longitude/latitude geometry and project it into metres."""
     if not geometry or geometry.get("type") != expected_type:
         raise ValidationError("Missing or unexpected geometry type.")
     geom = GEOSGeometry(json.dumps(geometry), srid=4326)
@@ -69,22 +73,26 @@ def projected_geometry(geometry, expected_type):
 
 
 def save_place(source, key, **values):
+    # The source/key pair makes reruns update the same qualified record.
     place = Place.objects.filter(source=source, source_key=key).first()
     created = place is None
     if created:
         place = Place(source=source, source_key=key)
     for field, value in values.items():
         setattr(place, field, value)
+    # Model save() does not run validators automatically.
     place.full_clean()
     place.save()
     return created
 
 
 def entry(row, key, outcome, reason, **extra):
+    """Keep each import decision traceable to its original source row."""
     return {"row": row, "source_key": key, "outcome": outcome, "reason": reason, **extra}
 
 
 def finish(command, slug, metadata, rows, warnings=()):
+    # Include the row-level ledger as well as totals so omissions are explainable.
     counts = Counter(item["outcome"] for item in rows)
     imported = [item for item in rows if item["outcome"] == "imported"]
     report = {
