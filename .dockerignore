@@ -44,3 +44,4 @@ data/raw/*
 !data/raw/heritage.geojson
 !data/raw/parks.geojson
 data/qualification.json
+data/import-reports

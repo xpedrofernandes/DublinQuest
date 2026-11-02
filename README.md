@@ -41,7 +41,7 @@ Adventures and visited stops will be saved for the same browser, without requiri
 
 The initial version focuses on spatial searches, interactive mapping and a complete exploration flow. It won't include live GPS tracking, turn-by-turn navigation or an AI assistant.
 
-The container foundation is running. Adventure features, dataset imports and the map are still to be implemented.
+The container foundation is running. The datasets can be imported into PostGIS. Adventure features and the map are still to be implemented.
 
 ## Running locally
 
@@ -78,7 +78,7 @@ The root URL has no application page yet. `/health/` checks database connectivit
 - `docker/db/`: first-run SQL that creates a restricted application database role.
 - `static/`: source assets; collected output stays inside the web container.
 
-The initial spatial schema is implemented in `places` and `adventures`; see [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) for fields, relationships, CRS handling and database-backed test commands. Migrations are applied explicitly during setup. Dataset import commands and application endpoints are still to be added.
+The initial spatial schema is implemented in `places` and `adventures`; see [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) for fields, relationships, CRS handling and database-backed test commands. Migrations are applied explicitly during setup. Dataset import commands are available below; application endpoints are still to be added.
 
 ## Containers and persistence
 
@@ -126,4 +126,22 @@ Screenshots, data attribution, API documentation and the user guide will be adde
 
 ## Data sources
 
-The repository includes four qualified, unmodified Dublin City Council dataset snapshots in `data/raw/` (3.27 MB total). They are third-party open data published under Creative Commons Attribution, separate from my original DublinQuest application code. See [DATA_SOURCES.md](DATA_SOURCES.md) for quality findings, attribution and reproduction commands, and [data/sources.json](data/sources.json) for exact resource URLs and SHA-256 checksums. A fresh clone includes the source files needed by the future import commands, without a separate dataset download. No attraction data has been imported yet; import commands will be added in a later phase. No photographs or external images are bundled.
+The repository includes four qualified, unmodified Dublin City Council dataset snapshots in `data/raw/` (3.27 MB total). They are third-party open data published under Creative Commons Attribution, separate from my original DublinQuest application code. See [DATA_SOURCES.md](DATA_SOURCES.md) for quality findings, attribution and reproduction commands, and [data/sources.json](data/sources.json) for exact resource URLs and SHA-256 checksums. A fresh clone includes the source files needed by the import commands, without a separate dataset download. The commands below populate PostGIS from those local snapshots. No photographs or external images are bundled.
+
+## Populating the database
+
+After the setup and migration steps above, run:
+
+```bash
+mkdir -p data/import-reports
+docker compose run --rm -T web python manage.py import_canvas > data/import-reports/canvas.json
+docker compose run --rm -T web python manage.py import_public_art --source-srid 4326 > data/import-reports/public_art.json
+docker compose run --rm -T web python manage.py import_heritage > data/import-reports/heritage.json
+docker compose run --rm -T web python manage.py import_parks > data/import-reports/parks.json
+```
+
+The CSV command explicitly declares WGS84 because its source metadata does not specify a datum; this interpretation is recorded in its report. The GeoJSON sources declare CRS84. All stored geometries are transformed to EPSG:2157. No external dataset downloads are needed.
+
+Each command writes a JSON report containing counts and the outcome/reason for every source row. Reports are ignored by Git. The verified baseline is **314 Canvas places, 82 public artworks, 42 heritage places and 484 park boundaries with 484 representative places: 922 places overall**. See [DATA_SOURCES.md](DATA_SOURCES.md) for exclusions and quarantine reasons.
+
+Re-running these commands updates the same source-keyed records rather than creating duplicates. It also restores their imported fields and park representative points, so run imports deliberately if staff have edited imported records. Commands verify the pinned snapshot checksums and run atomically per dataset; they do not erase the database, remove unrelated records, or download/repair source data. Do not update the source manifest to bypass a checksum error without qualifying the changed dataset first.

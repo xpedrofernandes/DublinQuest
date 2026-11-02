@@ -1,6 +1,6 @@
 # Database schema
 
-The initial schema is implemented in `places/models.py` and `adventures/models.py`, with committed initial migrations. Spatial data is stored in PostGIS, not SQLite. Dataset imports are the next Phase 2 milestone and are not implemented yet.
+The initial schema is implemented in `places/models.py` and `adventures/models.py`, with committed initial migrations. Spatial data is stored in PostGIS, not SQLite. The four dataset-specific management commands populate this schema from the bundled snapshots; see README and DATA_SOURCES.md for commands and audit counts.
 
 ## Spatial entities and provenance
 
@@ -16,17 +16,17 @@ All five geometry columns use EPSG:2157 and have GeoDjango spatial indexes (Post
 
 A park's optional representative Place must have category `park`; other categories cannot link to a Park. Deleting a Park cascades to its representative Place, but a Place used by an AdventureStop is protected. Deleting an Adventure removes its stops while retaining the attractions. There are no duplicated latitude/longitude columns.
 
-`source_key` is the importer's stable identifier within a dataset; source titles, artwork names and coordinates are not globally unique. The park importer should use the qualified `PRIMARYINDEX`. Other commands will define explicit snapshot identifiers rather than treating duplicated artwork profile links as unique keys.
+`source_key` is the importer's stable identifier within a dataset; source titles, artwork names and coordinates are not globally unique. The park importer uses the qualified `PRIMARYINDEX`. The point-source commands use one-based `row:<number>` keys within their checksum-pinned snapshot, rather than treating duplicated artwork profile links as unique keys. Changing snapshots requires a reviewed identifier/reconciliation decision.
 
 The guest owner UUID is a server-assigned session identifier, not a user-supplied ownership claim. It is not generated automatically on every Adventure: a future request handler must provide the session's owner identifier. No guest endpoints or ownership enforcement exist yet.
 
 ## Coordinates and generated geometry
 
-Source GeoJSON declares CRS84 (WGS84 longitude/latitude). Load GEOS points as `(longitude, latitude)`, assign the source SRID, then call `transform(2157)` before validation/save. Browser GeoJSON will be transformed back to EPSG:4326 later. The public-art CSV datum remains an explicitly documented qualification uncertainty; the import milestone must resolve or clearly gate its interpretation.
+Source GeoJSON declares CRS84 (WGS84 longitude/latitude). Load GEOS points as `(longitude, latitude)`, assign the source SRID, then call `transform(2157)` before validation/save. Browser GeoJSON will be transformed back to EPSG:4326 later. The public-art CSV datum remains an explicitly documented qualification uncertainty; the CSV command requires an explicit `--source-srid 4326` declaration and records the remaining datum uncertainty.
 
 Geometry validators reject empty/invalid geometry and require EPSG:2157. Django `save()` does not automatically call `full_clean()`: importers and future mutation paths must explicitly validate. PostgreSQL geometry typmods enforce stored type/SRID, while uniqueness and scalar checks provide separate database safeguards. Model validation is not a claim that raw SQL automatically enforces GEOS validity.
 
-Adventure search area and path are nullable until an adventure is generated. Later generation must fill the search polygon, construct a suggested sequence from the start and selected stops, and maintain the LineString when inputs change. This schema milestone stores those types but does not implement generation, routing or regeneration. A park's point-on-surface will likewise be synchronized explicitly in the import/update path rather than hidden inside model `save()`.
+Adventure search area and path are nullable until an adventure is generated. Later generation must fill the search polygon, construct a suggested sequence from the start and selected stops, and maintain the LineString when inputs change. This schema milestone stores those types but does not implement generation, routing or regeneration. The park importer explicitly synchronizes each representative point to the transformed boundary's point-on-surface; no synchronization is hidden inside model `save()`. Future staff park updates must use the same explicit synchronization rule.
 
 ## Migrations and tests
 

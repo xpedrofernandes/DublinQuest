@@ -1,6 +1,6 @@
 # DublinQuest data qualification
 
-Inspected 2 November 2026. This records the downloaded source snapshots and import decisions to review before implementing models or loaders. No records have been imported or repaired.
+Inspected 2 November 2026. This records qualification of the source snapshots and the implemented import rules. The Phase 2 results below distinguish imported, skipped and quarantined records; raw snapshots remain unmodified.
 
 ## Sources and reproducibility
 
@@ -27,7 +27,7 @@ docker compose run --rm --no-deps \
   web python /qualification.py /datasets > data/qualification.json
 ```
 
-The verification script uses Python's standard library. With the bundled files present, it makes no network requests and does not need curl. If a file is missing, it can recover the exact snapshot using system `curl` with TLS verification. It checks hashes before writing and fails if a resource changes; existing files are verified rather than overwritten. Git attributes disable text/line-ending conversion for these four files to preserve the recorded bytes on macOS and Windows. Future dataset-specific import commands will read these local snapshots; those commands do not exist yet.
+The verification script uses Python's standard library. With the bundled files present, it makes no network requests and does not need curl. If a file is missing, it can recover the exact snapshot using system `curl` with TLS verification. It checks hashes before writing and fails if a resource changes; existing files are verified rather than overwritten. Git attributes disable text/line-ending conversion for these four files to preserve the recorded bytes on macOS and Windows. The dataset-specific management commands read these local snapshots; see the README for fresh-clone population commands.
 
 The inspection script uses GeoDjango's GEOS/GDAL tools already in the web image. It reads mounted files only, transforms copies to EPSG:2157 for metric checks, and writes JSON to stdout. It does not access Django models, load a database or implement an ETL framework. Row references in the report are one-based data rows/features, excluding the CSV header. `data/qualification.json` is generated and ignored.
 
@@ -116,12 +116,40 @@ All four downloaded CKAN package responses identify Dublin City Council as the p
 
 Keep the supplied attribution, dataset title, publisher, resource link and licence link with each source. For Canvas also retain artist credits; for public art/heritage acknowledge the Dublin City Cultural Audit / Dublin City Council Culture Company context. Record modifications such as filtering, coordinate transformation, representative points and reviewed text corrections. The [CC BY 4.0 deed](https://creativecommons.org/licenses/by/4.0/) explains credit, licence linking and identification of changes; retain the actual supplied licence notice as well.
 
-The bundled raw snapshots are unmodified and have not yet been filtered or transformed. Attribution for these snapshots: “Dublin City Council open data via Smart Dublin: Dublin Canvas Public Art (2025), Public Artworks DCC (2021), Heritage Sites, Historic Monuments and Government Buildings (2024), and Parks and Open Spaces DCC (2016). Creative Commons Attribution.” The table above links each source; the publisher licence notice is retained above and in `data/sources.json`. Artist credits remain in the Canvas data. No photographs or external images are included.
+The bundled raw snapshots are unmodified. Imported copies are filtered and transformed in PostGIS. Attribution for these snapshots: “Dublin City Council open data via Smart Dublin: Dublin Canvas Public Art (2025), Public Artworks DCC (2021), Heritage Sites, Historic Monuments and Government Buildings (2024), and Parks and Open Spaces DCC (2016). Creative Commons Attribution.” The table above links each source; the publisher licence notice is retained above and in `data/sources.json`. Artist credits remain in the Canvas data. No photographs or external images are included.
 
-Proposed attribution text for the future processed application data: “Contains Dublin City Council open data from Smart Dublin: Dublin Canvas Public Art (2025), Public Artworks DCC (2021), Heritage Sites, Historic Monuments and Government Buildings (2024), and Parks and Open Spaces DCC (2016), published under Creative Commons Attribution. Data filtered and transformed for DublinQuest.” Link each title and the supplied licence notice in the eventual application. Do not imply endorsement. Dataset availability does not establish rights to download/rehost linked artwork photographs; no images were downloaded.
+Attribution text for the processed application data: “Contains Dublin City Council open data from Smart Dublin: Dublin Canvas Public Art (2025), Public Artworks DCC (2021), Heritage Sites, Historic Monuments and Government Buildings (2024), and Parks and Open Spaces DCC (2016), published under Creative Commons Attribution. Data filtered and transformed for DublinQuest.” Link each title and the supplied licence notice in the eventual application. Do not imply endorsement. Dataset availability does not establish rights to download/rehost linked artwork photographs; no images were downloaded.
 
 ## Comparison and remaining checks
 
 Counts, bytes, geometry types, Canvas null geometry and the Trinity positional concern match the earlier research. Old snapshot checksums were not retained, so byte-for-byte identity with Windows originals cannot be proved. Newly established findings include eight invalid park boundaries, detailed duplicate groups, status-qualified Canvas coverage and heritage mojibake. No original files were changed.
 
-Before import: review malformed Canvas text/overlapping current records, inspect representative attractions on a map, corroborate the CSV datum, and retain licence-version uncertainty explicitly. No geographic-accuracy audit of every attraction, access survey, source area reconciliation, live artwork-profile validation or image-rights review has been performed. Simple dataset-specific management commands will implement reviewed decisions later; this phase adds neither models nor database import commands.
+Quarantined Canvas/heritage records can be reconsidered after explicit text/location review; corroborating the CSV datum and retaining the licence-version uncertainty remain important. No geographic-accuracy audit of every attraction, access survey, source area reconciliation, live artwork-profile validation or image-rights review has been performed. The management commands implement the exclusions below without silently correcting source data.
+
+
+## Phase 2 import results
+
+Each command uses `BaseCommand`, conventional GeoDjango geometry operations, `full_clean()` and source-keyed saves, following the labs' management-command loading approach. A small shared helper contains checksum/provenance, validation and report formatting; there is no import framework or background worker. Display names/descriptions and URLs have surrounding whitespace trimmed; no geographic coordinates or damaged text are silently corrected. Each dataset is one atomic database transaction. Unexpected failures roll back the dataset; deliberately rejected records are reported and omitted. Park and representative-Place writes also use a savepoint so a validation failure cannot leave half a pair.
+
+| Dataset | Source rows | Imported rows | Skipped | Quarantined |
+|---|---:|---:|---:|---:|
+| Canvas | 912 | 314 | 586 | 12 |
+| Public artworks | 82 | 82 | 0 | 0 |
+| Heritage | 45 | 42 | 0 | 3 |
+| Parks | 566 | 484 | 74 | 8 |
+
+A park imported row creates/updates one Park boundary and one representative Place. Thus the database contains four DatasetSources, 484 Parks and 922 Places (314 + 82 + 42 + 484). No Adventure or AdventureStop is generated by imports. Every source row has exactly one outcome. Imported counts are eligible source rows; `created`/`updated` distinguish first and subsequent runs. `updated` means an existing record was refreshed, even if the imported values were unchanged.
+
+Canvas skip reasons: 14 missing names (blank trailing rows), 24 missing coordinates, 229 outside DCC scope, 318 historical/noncurrent statuses and one exact duplicate. Quarantines: three eligible rows with malformed UTF-8, one with an existing replacement character, and eight conflicting current artworks at four shared points. Raw source text problems in already excluded historic/out-of-scope rows retain that earlier exclusion reason. No arbitrary newest-artwork choice is made. Exact duplicate rows 33/34 retain row 33; conflicting pairs 107/108, 120/229, 126/231 and 322/325 are all quarantined.
+
+Heritage quarantines: damaged titles at rows 12 and 41, plus Trinity College at row 40 pending positional verification. No spellings or coordinates were invented to rescue those records. Public-art same-name sculptures remain separate records.
+
+Park quarantines: all eight invalid boundaries listed above. Skips: six other unnamed rows and 68 institutional/graveyard rows. One of the seven unnamed features is also invalid and therefore counted under quarantine, not twice. Missing amenity fields are not converted into claims that amenities are absent. Stored representative-point descriptions explicitly state that they are not verified entrances.
+
+The decision order is intentional: Canvas checks missing name/geometry, council and status before text/duplicate ambiguity; parks check validity before missing name/typology. JSON reports contain the snapshot checksum, source row/key, outcome and reason, with validation detail where applicable. They provide a reproducible quarantine ledger against the original bundled bytes, not modified copies of those bytes. Save reports to ignored `data/import-reports/` using the README commands.
+
+Point-source keys are `row:<one-based row>` and are valid within the exact checksum-pinned snapshot. Park keys use unique `PRIMARYINDEX`. Repeated runs refresh the same IDs under `(source, source_key)` uniqueness and synchronize park representative points. They do not delete unrelated/manual records or reconcile a different snapshot. Keep reviewed policy/snapshot changes separate from routine reruns, particularly after staff edits.
+
+The CSV importer requires `--source-srid 4326` to make its interpretation visible; its JSON warning explicitly says that this is not publisher confirmation. GeoJSON CRS84 is checked before loading. Geometry copies use longitude/latitude order and transform to EPSG:2157; raw sources and SHA-256 values are unchanged.
+
+Database-backed tests load all four bundled datasets into a separate PostGIS test database twice, checking expected outcomes, stable primary keys, representative-point synchronization, geometry validity/SRIDs, SQL containment and a PostGIS transformation of a known source point. Tests also reject changed checksums/missing CSV SRID declaration and verify atomic rollback after an unexpected write failure. See DATABASE_SCHEMA.md for the restricted-role test setup.
