@@ -179,20 +179,39 @@
     $('distance-summary').textContent = `${metres(adventure.total_distance_m)} of straight-line connections`;
     $('adventure-warnings').textContent = adventure.warnings.join(' ');
     $('adventure-warnings').hidden = !adventure.warnings.length;
-    $('progress-label').textContent = `${adventure.progress.visited} of ${adventure.progress.total} visited · ${adventure.progress.percent}%`;
+    $('quest-stop-count').textContent = `${adventure.stops.length} discoveries`;
+    $('progress-label').textContent = `${adventure.progress.visited} of ${adventure.progress.total} marked visited · ${adventure.progress.percent}%`;
     $('adventure-progress').value = adventure.progress.percent;
     $('completion').hidden = !adventure.progress.complete;
+    $('completion-detail').textContent = `You marked all ${adventure.stops.length} stops visited. Your quest is saved for this browser.`;
+    $('journey-link').hidden = false;
+    // "Next" is the first unchecked stop in the sequence, never GPS position.
+    const nextStop = adventure.stops.find(stop => !stop.visited);
+    $('next-discovery').hidden = !nextStop;
+    if (nextStop) {
+      $('next-name').textContent = nextStop.place.properties.name;
+      $('next-description').textContent = `Stop ${nextStop.position} · ${labels[nextStop.place.properties.category]} · First stop not yet marked visited`;
+      $('next-map').onclick = () => focusStop(nextStop);
+    }
     const list = $('stop-list'); list.replaceChildren();
     for (const stop of adventure.stops) {
       const feature = stop.place, properties = feature.properties;
       const [stopLng, stopLat] = feature.geometry.coordinates;
       const marker = L.marker([stopLat, stopLng], {icon: icon(stop.position, properties.category, stop.visited), title: `${stop.position}. ${properties.name}`, alt: `Stop ${stop.position}: ${properties.name}`}).addTo(adventureLayer).bindPopup(popup(feature, `${stop.position}. ${properties.name}`));
       stopMarkers.set(stop.id, marker);
-      const card = node('li', undefined, `stop-card${stop.visited ? ' visited' : ''}`);
+      const isNext = nextStop && stop.id === nextStop.id;
+      const card = node('li', undefined, `stop-card ${stop.visited ? 'visited' : isNext ? 'next-stop' : 'upcoming'}`);
+      if (isNext) card.setAttribute('aria-current', 'step');
       card.dataset.stopId = stop.id;
       card.append(node('span', String(stop.position), 'stop-number'));
       const content = node('div');
-      content.append(node('span', labels[properties.category], `category-badge ${properties.category}`), node('h3', properties.name), node('p', properties.description || 'No description supplied by the source dataset.'));
+      const cardHeading = node('div', undefined, 'stop-card-heading');
+      const status = node('span', undefined, 'stop-state');
+      const statusIcon = node('span', stop.visited ? '✓' : isNext ? '↗' : '○');
+      statusIcon.setAttribute('aria-hidden', 'true');
+      status.append(statusIcon, node('span', stop.visited ? 'Visited' : isNext ? 'Next stop' : 'Upcoming'));
+      cardHeading.append(node('span', labels[properties.category], `category-badge ${properties.category}`), status);
+      content.append(cardHeading, node('h3', properties.name), node('p', properties.description || 'No description supplied by the source dataset.'));
       if (properties.artist) content.append(node('p', `Artist: ${properties.artist}`));
       if (properties.category === 'park') content.append(node('p', 'Representative point within the park; not a verified entrance.'));
       content.append(node('p', `${metres(stop.distance_from_start_m)} from start · ${metres(stop.distance_from_previous_m)} from previous stop (straight line)`));
@@ -214,7 +233,7 @@
           await refreshSaved();
         });
       });
-      label.append(checkbox, node('span', 'Visited'));
+      label.append(checkbox, node('span', stop.visited ? 'Marked visited' : 'Mark visited'));
       controls.append(label, button('Show on map', () => focusStop(stop)));
       content.append(controls, sourceDetails(feature)); card.append(content); list.append(card);
     }
@@ -270,6 +289,7 @@
     $('distance-summary').textContent = visible
       ? `${metres(route.distance_m)} · ${(route.duration_s / 60).toFixed(1)} min estimated walking`
       : `${metres(state.adventure.total_distance_m)} of straight-line connections`;
+    $('route-type').textContent = visible ? 'Walking estimate' : state.walkingLoading ? 'Calculating walking route' : 'Straight-line sequence';
     if (!visible) return;
     L.geoJSON(route.route, {style: {color: '#2267bd', weight: 5, opacity: .85}}).addTo(walkingLayer);
     $('walking-metrics').textContent = `${metres(route.distance_m)} estimated walking distance · ${(route.duration_s / 60).toFixed(1)} minutes walking`;
@@ -419,7 +439,7 @@
       run('Deleting adventure…', async () => {
         await api(`/api/adventures/${state.adventure.id}/`, 'DELETE');
         for (const [key, entry] of walkingCache) { if (entry.id === state.adventure.id) walkingCache.delete(key); }
-        state.adventure = null; clearWalking(); state.geometryKey = null; adventureLayer.clearLayers(); stopMarkers.clear(); $('adventure-section').hidden = true; $('welcome').hidden = false;
+        state.adventure = null; clearWalking(); state.geometryKey = null; adventureLayer.clearLayers(); stopMarkers.clear(); $('adventure-section').hidden = true; $('welcome').hidden = false; $('journey-link').hidden = true;
         tell('Adventure deleted. Your imported places and parks are unchanged.'); await refreshSaved(); $('saved-heading').scrollIntoView({block: 'center'});
       });
     });

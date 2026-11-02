@@ -1,9 +1,10 @@
 :root {
-  --ink:#173d32;
+  --ink:#123f32;
+  --forest:#215442;
   --muted:#52645c;
-  --paper:#f6f5ee;
+  --paper:#f8f4eb;
   --line:#dce3d9;
-  --accent:#e6b85e;
+  --accent:#b54d27;
   --street_art:#823d77;
   --public_art:#26628c;
   --heritage:#94551c;
@@ -62,8 +63,9 @@ h3 {
   justify-content:space-between;
   gap:20px;
   padding:20px 4vw;
-  background:#fff;
-  border-bottom:1px solid var(--line)
+  background:var(--ink);
+  color:#fff9ed;
+  border-bottom:1px solid #2c5948
 }
 
 .brand {
@@ -76,14 +78,14 @@ h3 {
 }
 
 .brand>span:last-child {
-  color:#66835c
+  color:#d0dfbc
 }
 
 .brand-icon {
   display:grid;
   place-items:center;
-  background:var(--ink);
-  color:#fff;
+  background:#f8f0df;
+  color:var(--ink);
   font-size:.8rem;
   letter-spacing:-.04em;
   width:38px;
@@ -198,7 +200,7 @@ h3 {
 }
 
 .hint,.optional {
-  font-size:.78rem;
+  font-size:.82rem;
   line-height:1.55;
   color:var(--muted)
 }
@@ -571,7 +573,7 @@ progress::-webkit-progress-value {
 }
 
 .stop-card p {
-  font-size:.8rem;
+  font-size:.875rem;
   line-height:1.65;
   margin:8px 0;
   color:var(--muted)
@@ -771,6 +773,291 @@ button:disabled {
   color:#235b42
 }
 
+/* Quest presentation: all states come from the existing saved checklist. */
+.site-header a {
+  color:inherit;
+}
+.site-header nav a:hover {
+  color:#f2cda8;
+}
+.intro h1 {
+  max-width:800px;
+}
+.city-tag {
+  border-color:#c5d0bc;
+  color:var(--forest);
+  background:#fffaf0;
+}
+.panel {
+  box-shadow:0 6px 22px #173d3205;
+}
+.builder-step {
+  display:flex;
+  align-items:center;
+  gap:9px;
+  font-size:.875rem;
+  font-weight:750;
+  margin:22px 0 14px;
+}
+.builder-step span {
+  display:grid;
+  place-items:center;
+  width:28px;
+  height:28px;
+  border:1px solid #ddc4ad;
+  border-radius:50%;
+  color:#94401f;
+  background:#fff4e7;
+  font-size:.66rem;
+}
+.start-summary {
+  border-left:3px solid var(--accent);
+}
+.category-option {
+  border-left-width:3px;
+}
+.category-option.street_art { border-left-color:var(--street_art); }
+.category-option.public_art { border-left-color:var(--public_art); }
+.category-option.heritage { border-left-color:var(--heritage); }
+.category-option.park { border-left-color:var(--park); }
+.quest-nav {
+  display:none;
+}
+#builder,#map-panel,#adventure-section {
+  scroll-margin-top:18px;
+}
+.quest-header {
+  background:var(--ink);
+  color:#fff9ed;
+  border-radius:13px;
+  padding:24px;
+  margin-bottom:20px;
+}
+.quest-heading-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+}
+.quest-header .eyebrow {
+  color:#d2dfc2;
+}
+.quest-header h2 {
+  font-size:clamp(1.4rem,2.4vw,2rem);
+  line-height:1.2;
+  margin:0;
+}
+.quest-seal {
+  display:grid;
+  place-items:center;
+  flex-shrink:0;
+  border:1px solid #799a79;
+  border-radius:50%;
+  width:44px;
+  height:44px;
+  font-size:1.5rem;
+  color:#f0bd8e;
+}
+.quest-facts {
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:9px 16px;
+  font-size:.78rem;
+  margin:20px 0;
+  color:#e0e9d8;
+}
+.quest-facts > span:not(:first-child) {
+  border-left:1px solid #678372;
+  padding-left:16px;
+}
+.quest-facts #distance-summary {
+  font-size:.82rem;
+  color:inherit;
+  text-align:left;
+}
+.quest-header .progress-heading {
+  flex-wrap:wrap;
+  gap:5px;
+  font-size:.82rem;
+}
+.quest-header progress {
+  margin:10px 0;
+  accent-color:#edb27e;
+}
+.quest-header progress::-webkit-progress-value {
+  background:#edb27e;
+}
+.quest-header progress::-moz-progress-bar {
+  background:#edb27e;
+}
+.progress-disclaimer {
+  font-size:.73rem;
+  color:#d2dfc2;
+  margin:0;
+  line-height:1.6;
+}
+.next-discovery {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:16px;
+  border:1px solid #d7c7ad;
+  border-left:4px solid var(--accent);
+  background:#fff8eb;
+  border-radius:12px;
+  padding:18px;
+  margin-bottom:20px;
+}
+.next-discovery .eyebrow {
+  color:#94401f;
+  margin-bottom:7px;
+}
+.next-discovery h3 {
+  font-size:1.1rem;
+  margin-bottom:4px;
+}
+.next-discovery .hint {
+  margin:0;
+}
+.next-discovery .btn {
+  flex-shrink:0;
+}
+.route-information {
+  padding-bottom:18px;
+  margin-bottom:20px;
+  border-bottom:1px solid var(--line);
+}
+.route-information .notice {
+  background:#f4f6f0;
+  margin-bottom:10px;
+}
+.route-information .warning {
+  background:#fff1ce;
+}
+.walking-controls {
+  font-size:.82rem;
+  line-height:1.65;
+}
+.route-information details summary {
+  align-content:center;
+  font-weight:650;
+  cursor:pointer;
+}
+.routing-attribution {
+  margin:8px 0 0;
+  font-size:.73rem;
+}
+.warning-text:not(:empty) {
+  color:#794018;
+  border-left:3px solid #b56b27;
+  padding:8px;
+  background:#fff1ce;
+}
+.journey-heading {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-bottom:16px;
+}
+.journey-heading h3 {
+  margin:0;
+  font-size:1.1rem;
+}
+.journey-heading > span {
+  font-size:.73rem;
+  color:var(--muted);
+}
+.stop-list {
+  gap:16px;
+}
+.stop-card {
+  position:relative;
+  padding:18px 16px;
+  border-radius:13px;
+}
+.stop-card:not(:last-child)::after {
+  content:"";
+  position:absolute;
+  left:31px;
+  top:100%;
+  height:17px;
+  border-left:2px solid #b8cdb8;
+}
+.stop-card-heading {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.stop-state {
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  font-size:.73rem;
+  font-weight:700;
+  color:var(--muted);
+}
+.stop-card.next-stop {
+  border-color:#b88f64;
+  box-shadow:inset 3px 0 0 var(--accent);
+  background:#fffcf6;
+}
+.next-stop .stop-state {
+  color:#94401f;
+}
+.visited .stop-state {
+  color:#315a37;
+}
+.stop-card.visited {
+  background:#f0f5ec;
+  border-color:#c3d2bc;
+}
+.stop-card h3 {
+  margin:10px 0 6px;
+  font-size:1.1rem;
+  line-height:1.35;
+}
+.stop-card .visit-toggle {
+  padding:8px 12px;
+  border:1px solid #b5c7b6;
+  border-radius:8px;
+  background:#fff;
+  cursor:pointer;
+  min-height:46px;
+}
+.completion {
+  display:flex;
+  align-items:flex-start;
+  gap:18px;
+  padding:22px;
+  border:1px solid #b8cfac;
+  margin-bottom:20px;
+}
+.completion-mark {
+  display:grid;
+  place-items:center;
+  flex-shrink:0;
+  width:44px;
+  height:44px;
+  background:var(--ink);
+  border-radius:50%;
+  color:white;
+  font-size:1.3rem;
+}
+.completion h3 {
+  font-size:1.55rem;
+}
+.completion p {
+  font-weight:400;
+  font-size:.85rem;
+}
+.completion .eyebrow {
+  font-size:.65rem;
+  font-weight:750;
+}
 @media(min-width:1400px) {
   #map {
     height:570px
@@ -869,7 +1156,7 @@ button:disabled {
   }
 
   .distance-summary {
-    max-width:110px
+    max-width:none
   }
 
   .map-caption {
@@ -899,6 +1186,79 @@ button:disabled {
 
 }
 
+@media(max-width:700px) {
+  .intro {
+    padding-top:20px;
+  }
+  .intro h1 {
+    font-size:2rem;
+  }
+  .quest-nav {
+    display:flex;
+    gap:8px;
+    margin-bottom:16px;
+  }
+  .quest-nav a {
+    display:grid;
+    place-items:center;
+    flex:1;
+    min-height:46px;
+    border:1px solid #b9c9b8;
+    border-radius:10px;
+    background:white;
+    color:var(--ink);
+    font-size:.85rem;
+    font-weight:700;
+    text-decoration:none;
+  }
+  .quest-header {
+    padding:18px;
+  }
+  .quest-facts {
+    margin:16px 0;
+    gap:10px;
+  }
+  .quest-facts > span:not(:first-child) {
+    padding-left:10px;
+  }
+  .next-discovery {
+    align-items:stretch;
+    flex-direction:column;
+    padding:16px;
+  }
+  .next-discovery .btn {
+    width:100%;
+  }
+  .journey-heading > span {
+    display:none;
+  }
+  .stop-card {
+    grid-template-columns:28px minmax(0,1fr);
+    padding:16px 12px;
+  }
+  .stop-card:not(:last-child)::after {
+    left:25px;
+  }
+  .stop-controls {
+    align-items:stretch;
+    flex-direction:column;
+    gap:4px;
+  }
+  .stop-controls .text-button {
+    text-align:left;
+  }
+  .completion {
+    padding:16px;
+    gap:12px;
+  }
+  .completion-mark {
+    width:32px;
+    height:32px;
+  }
+  .completion .btn {
+    width:100%;
+  }
+}
 @media(prefers-reduced-motion:reduce) {
   * {
     scroll-behavior:auto!important;

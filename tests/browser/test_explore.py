@@ -106,6 +106,17 @@ def main():
             assert len(routing_calls) == 1
             assert page.locator('#stop-list > li').count() == 5
             assert page.locator('.quest-pin:not(.start-pin)').count() == 5
+            assert page.locator('#quest-stop-count').inner_text() == '5 discoveries'
+            assert page.locator('#next-name').inner_text() == result['stops'][0]['place']['properties']['name']
+            assert page.locator('#stop-list .next-stop').count() == 1
+            assert page.locator('#stop-list [aria-current="step"]').count() == 1
+            assert page.locator('#stop-list .upcoming').count() == 4
+            # Visiting out of order must not skip the first unchecked stop.
+            page.locator('#stop-list input').nth(2).check(); idle()
+            assert page.locator('#next-name').inner_text() == result['stops'][0]['place']['properties']['name']
+            assert page.locator('#stop-list > li').nth(2).locator('.stop-state span').last.inner_text() == 'Visited'
+            page.locator('#stop-list input').nth(2).uncheck(); idle()
+            assert len(routing_calls) == 1
             for stop in result['stops']:
                 card = page.locator(f'[data-stop-id="{stop["id"]}"]')
                 assert card.locator('h3').inner_text() == stop['place']['properties']['name']
@@ -121,6 +132,7 @@ def main():
             page.locator('#stop-list input').first.check()
             idle()
             assert '1 of 5' in page.locator('#progress-label').inner_text()
+            assert page.locator('#next-name').inner_text() == result['stops'][1]['place']['properties']['name']
             assert page.locator('#walking-summary').is_visible()
             assert len(routing_calls) == 1
             page.reload(); idle()
@@ -132,6 +144,10 @@ def main():
             assert len(routing_calls) == 2  # Cached reopening does not refetch.
             page.locator('#stop-list input').first.uncheck(); idle()
             assert '0 of 5' in page.locator('#progress-label').inner_text()
+            assert page.locator('#next-name').inner_text() == result['stops'][0]['place']['properties']['name']
+            click('#next-map')
+            assert page.locator('.leaflet-popup').is_visible()
+            page.locator('.leaflet-popup-close-button').click()
 
             # All three independent spatial query controls, including pagination.
             click('#nearby')
@@ -194,6 +210,7 @@ def main():
             page.once('dialog', lambda dialog: dialog.accept())
             click('#regenerate')
             assert page.locator('#stop-list > li').count() == 3
+            assert page.locator('#quest-stop-count').inner_text() == '3 discoveries'
             assert '0 of 3' in page.locator('#progress-label').inner_text()
             assert page.locator('#walking-summary').is_hidden()
             assert page.locator('#map path[stroke="#2267bd"]').count() == 0
@@ -225,6 +242,16 @@ def main():
             for checkbox in page.locator('#stop-list input').all():
                 checkbox.check(); idle()
             assert page.locator('#completion').is_visible()
+            assert page.locator('#next-discovery').is_hidden()
+            assert page.locator('#stop-list .visited').count() == 3
+            assert page.locator('#stop-list [aria-current="step"]').count() == 0
+            page.locator('#stop-list input').first.uncheck(); idle()
+            assert page.locator('#completion').is_hidden()
+            assert page.locator('#next-discovery').is_visible()
+            assert page.locator('#stop-list > li').first.get_attribute('aria-current') == 'step'
+            page.locator('#stop-list input').first.check(); idle()
+            assert page.locator('#completion').is_visible()
+            assert len(routing_calls) == 5
             # Show a server/network failure without losing the adventure.
             page.route('**/api/adventures/?*', lambda route: route.abort())
             page.route('**/api/adventures/', lambda route: route.abort())

@@ -20,7 +20,7 @@ internet access to OpenStreetMap. Do not test from a `file://` copy of the HTML.
    `53.34517, -6.25892`. This is a statue location, not a verified campus entrance.
    Alternatively, click the map: the brown **S** marker identifies the new start.
 2. Leave all four categories selected, choose **2 km** and **5 stops**. Give the
-   adventure a name if desired, then select **Generate adventure**.
+   adventure a name if desired, then select **Build my quest**.
 3. Expect five numbered map markers and five cards in the same order, a radius
    overlay, a connecting line and progress **0 of 5**. With the unchanged bundled
    data and the statue origin, the sequence is Normal People, Henry Grattan
@@ -42,7 +42,7 @@ internet access to OpenStreetMap. Do not test from a `file://` copy of the HTML.
   below the map/results. Reload the page, then select **Open adventure**: its
   stops and progress should reappear. The initial page does not automatically
   choose one of your saved adventures.
-- Check **Visited** on the first stop. Expect **1 of 5 / 20%**. Reload and reopen
+- Check **Mark visited** on the first stop. Expect **1 of 5 / 20%**. Reload and reopen
   to verify persistence. Uncheck it to return to zero.
 - Mark all stops visited to see the completion message. This is a manual checklist,
   not GPS verification of a visit.
@@ -201,3 +201,26 @@ Automatic-route regression checks hold a mocked response open to verify non-bloc
 rendering, then test success, missing-key fallback, network errors, cached saved
 loading, regeneration and ignored late responses. These checks consume no live
 routing quota.
+
+## Quest presentation and progression
+
+- The builder has three steps: Choose your start, Pick your discoveries, Build your
+  quest. The quest header shows the actual stop count, route type, distance/time
+  and the saved checklist progress. Routing warnings and attribution remain visible;
+  expand Route details & waypoint adjustments for snapping information.
+- Next discovery and the Next stop card always identify the **first unvisited stop
+  in the saved sequence**, never your GPS location. Show on map opens its marker.
+- Mark the third stop before the first: the first remains next, while the third
+  gains a Visited label. Mark the first to advance the next discovery. Unmark it
+  to restore it. Labels and icons distinguish states as well as colour.
+- Mark every stop to reveal Quest complete and hide Next discovery. Unmark any stop
+  to hide completion and restore the first unchecked stop. All progress is
+  explicitly self-reported; the app does not verify physical visits.
+- At phone widths, use Map / Journey / Edit quest links. Visited controls and the
+  next-discovery action have large touch targets. No drawer or overlay obscures
+  the map, its controls or its attribution. Use keyboard Tab/Enter/Space too.
+
+The browser regression covers these progression cases and automatic routing-cache
+behaviour with mocked external services. The design was also inspected in headed
+Chrome at 1440, 820 and 390 px, including reduced-motion preference, mobile links
+and completion. This is a focused usability check, not a formal accessibility audit.

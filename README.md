@@ -11,7 +11,11 @@ Instead of following a fixed tour, you choose where to start, what interests you
 1. Choose a starting place or click a location on the map.
 2. Select your interests, a search radius and the number of stops.
 3. Explore the suggested stops using the map and an ordered list of places.
-4. Mark stops as visited and keep track of your progress.
+4. Follow your quest journey, mark stops as visited and keep track of your progress.
+
+The next discovery is the first stop you have not marked visited. Journey cards
+distinguish Next stop, Upcoming and Visited; completing the checklist reveals a
+Quest complete panel. Progress is self-reported, not verified by GPS.
 
 The map shows the starting point, search area, numbered stops and a suggested sequence connecting them. Each stop includes a description, category and distance information.
 
