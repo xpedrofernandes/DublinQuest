@@ -5,6 +5,8 @@
 /microsoft/
 /Microsoft/
 /LOCAL_DEVELOPMENT.md
+/FINAL_AUDIT.md
+/SUBMISSION.md
 
 # Local secrets; retain the public configuration template.
 .env

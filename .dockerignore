@@ -8,6 +8,8 @@ docs
 microsoft
 Microsoft
 LOCAL_DEVELOPMENT.md
+FINAL_AUDIT.md
+SUBMISSION.md
 .venv
 venv
 __pycache__

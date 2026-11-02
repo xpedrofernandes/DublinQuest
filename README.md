@@ -57,31 +57,114 @@ The application includes an interactive Leaflet map, adventure builder, saved gu
 
 ## Running locally
 
-Docker Desktop with Docker Compose is required. No host Python, PostgreSQL or GIS installation is needed.
+This guide starts from a fresh clone and an empty database volume. Docker Desktop
+(or Docker Engine) must be running in Linux-container mode with Docker Compose v2.
+No host Python, PostgreSQL or GIS installation is needed. Allow ports **8000** and
+**5050**; internet access is needed for the initial build and OpenStreetMap tiles.
+The four source datasets are already bundled in the repository.
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/xpedrofernandes/DublinQuest.git
+cd DublinQuest
+```
+
+If using the ZIP instead, extract it and open a terminal in the folder containing
+`docker-compose.yml`, then continue below.
+
+### 2. Configure the environment
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and replace all `change-me` values with different random passwords and a long Django secret key. `openssl rand -hex 32` can generate each value. Keep `.env` private. The database administrator and application use separate accounts; keep their usernames different.
+Edit `.env` before starting containers:
+
+- Replace every `change-me` value: `POSTGRES_PASSWORD`, `DATABASE_PASSWORD`,
+  `DJANGO_SECRET_KEY` and `PGADMIN_DEFAULT_PASSWORD`. Use different random values;
+  `openssl rand -hex 32` can generate each one.
+- Keep `POSTGRES_USER` and `DATABASE_USER` different: the default names are
+  `postgres` (administrator) and `dublinquest` (restricted application account).
+- Keep `DJANGO_DEBUG=False` and the default localhost allowed hosts for this setup.
+- `PGADMIN_DEFAULT_EMAIL` is the pgAdmin login name; set it to your preferred email.
+- Leave **`ORS_API_KEY=` blank** unless you want optional pedestrian routes.
+  **DublinQuest works without a routing key:** generating/saving quests, spatial
+  searches and visit progress all work with the dashed straight-line sequence.
+  That sequence is not walking directions. See [Optional walking routes](#optional-walking-routes).
+- Keep `DOCKER_SUBNET=172.28.40.0/24` unless it conflicts with another local network;
+  choose a non-overlapping subnet before first startup if necessary.
+
+Keep `.env` private. It is excluded from Git, the Docker build context and the
+submission archive. Never replace `.env.example` with your real credentials.
+
+### 3. Build the web image, start PostGIS and apply migrations
+
+Run each command in order and check that it succeeds before continuing:
 
 ```bash
 docker compose config --quiet
 docker compose build web
 docker compose up -d --wait db
-docker compose run --rm web python manage.py migrate --noinput
+docker compose run --rm -T web python manage.py migrate --noinput
+```
+
+The database's first startup creates PostGIS and the restricted application role.
+Migrations create the Django tables. The temporary `run --rm` web containers use
+that same database and exit after each command.
+
+### 4. Import all four bundled datasets
+
+```bash
+mkdir -p data/import-reports
+docker compose run --rm -T web python manage.py import_canvas > data/import-reports/canvas.json
+docker compose run --rm -T web python manage.py import_public_art --source-srid 4326 > data/import-reports/public_art.json
+docker compose run --rm -T web python manage.py import_heritage > data/import-reports/heritage.json
+docker compose run --rm -T web python manage.py import_parks > data/import-reports/parks.json
+```
+
+Each command writes its results to the corresponding local JSON report. No
+external dataset downloads are required. The public-art command requires
+`--source-srid 4326` to explicitly declare its documented WGS84 interpretation.
+After all four complete, expect **922 Places, 484 Parks and four DatasetSources**.
+See [Import behaviour](#import-behaviour) for exclusions and repeat-run behaviour.
+
+### 5. Start and check the application
+
+```bash
 docker compose up -d --wait
+docker compose ps
+docker compose exec web python manage.py check
+```
+
+This starts Django/Gunicorn and pgAdmin alongside PostGIS. The web container
+collects static assets automatically; there is no separate frontend build step.
+
+- DublinQuest: http://localhost:8000/ — choose a start and build a quest.
+- Readiness: http://localhost:8000/health/ — expect `{"status":"ok"}`.
+- Spatial API: http://localhost:8000/api/places/?format=json — expect count 922.
+- pgAdmin: http://localhost:5050/ — use the pgAdmin credentials chosen in `.env`.
+
+The guest application needs no login. `/health/` checks database connectivity and
+PostGIS availability; it does not check import counts or certify migrations.
+
+### 6. Optional staff account and database management
+
+To create a staff/superuser account for spatial CRUD:
+
+```bash
 docker compose exec web python manage.py createsuperuser
 ```
 
-- DublinQuest: http://localhost:8000/
-- Readiness: http://localhost:8000/health/
-- Django administration: http://localhost:8000/admin/
-- pgAdmin: http://localhost:5050/ — sign in with the pgAdmin credentials in `.env`.
+Log in at http://localhost:8000/api-auth/login/?next=/api/ to use the authenticated
+DRF browsable API. [API.md](API.md) includes temporary-record CRUD examples.
+http://localhost:8000/admin/ manages Django accounts; spatial models are managed
+through the API. Staff login is not required to generate or save guest quests.
 
-In pgAdmin, register a server with host `db`, port `5432`, maintenance database matching `POSTGRES_DB`, and the `DATABASE_USER` / `DATABASE_PASSWORD` application credentials. Use the administrator credentials only for database administration. Django staff accounts are separate from both database and pgAdmin accounts.
-
-`/health/` checks database connectivity and PostGIS availability; it returns JSON with HTTP 200 when ready or 503 when unavailable. It does not certify that migrations have been applied.
+In pgAdmin, register a server with host `db`, port `5432`, maintenance database
+matching `POSTGRES_DB`, and the `DATABASE_USER` / `DATABASE_PASSWORD` application
+credentials. Use the administrator credentials only for database administration.
+Django staff accounts are separate from database and pgAdmin accounts.
 
 ## Project structure
 
@@ -92,7 +175,7 @@ In pgAdmin, register a server with host `db`, port `5432`, maintenance database 
 - `templates/explore.html`: accessible adventure-builder page.
 - `static/`: original CSS/JavaScript and licensed Leaflet/Bootstrap assets; collected output stays inside the web container.
 
-The spatial schema is implemented in `places` and `adventures`; see [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) for fields, relationships, CRS handling and database-backed test commands. Migrations are applied explicitly during setup. Dataset import commands are available below; the places/parks endpoints and spatial searches are documented in [API.md](API.md). The frontend uses these same APIs; it does not repeat spatial queries or stop selection in JavaScript.
+The spatial schema is implemented in `places` and `adventures`; see [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) for fields, relationships, CRS handling and database-backed test commands. Migrations are applied explicitly during setup. Dataset import commands are included in the setup guide above; the places/parks endpoints and spatial searches are documented in [API.md](API.md). The frontend uses these same APIs; it does not repeat spatial queries or stop selection in JavaScript.
 
 ## Containers and persistence
 
@@ -140,19 +223,9 @@ See [FRONTEND_TESTING.md](FRONTEND_TESTING.md) for the browser testing guide, re
 
 ## Data sources
 
-The repository includes four qualified, unmodified Dublin City Council dataset snapshots in `data/raw/` (3.27 MB total). They are third-party open data published under Creative Commons Attribution, separate from my original DublinQuest application code. See [DATA_SOURCES.md](DATA_SOURCES.md) for quality findings, attribution and reproduction commands, and [data/sources.json](data/sources.json) for exact resource URLs and SHA-256 checksums. A fresh clone includes the source files needed by the import commands, without a separate dataset download. The commands below populate PostGIS from those local snapshots. No dataset photographs are bundled. Small Leaflet library icons are included separately under their library licence; map tiles are loaded from OpenStreetMap at runtime.
+The repository includes four qualified, unmodified Dublin City Council dataset snapshots in `data/raw/` (3.27 MB total). They are third-party open data published under Creative Commons Attribution, separate from my original DublinQuest application code. See [DATA_SOURCES.md](DATA_SOURCES.md) for quality findings, attribution and reproduction commands, and [data/sources.json](data/sources.json) for exact resource URLs and SHA-256 checksums. A fresh clone includes the source files needed by the import commands, without a separate dataset download. The setup guide above populates PostGIS from those local snapshots. No dataset photographs are bundled. Small Leaflet library icons are included separately under their library licence; map tiles are loaded from OpenStreetMap at runtime.
 
-## Populating the database
-
-After the setup and migration steps above, run:
-
-```bash
-mkdir -p data/import-reports
-docker compose run --rm -T web python manage.py import_canvas > data/import-reports/canvas.json
-docker compose run --rm -T web python manage.py import_public_art --source-srid 4326 > data/import-reports/public_art.json
-docker compose run --rm -T web python manage.py import_heritage > data/import-reports/heritage.json
-docker compose run --rm -T web python manage.py import_parks > data/import-reports/parks.json
-```
+## Import behaviour
 
 The CSV command explicitly declares WGS84 because its source metadata does not specify a datum; this interpretation is recorded in its report. The GeoJSON sources declare CRS84. All stored geometries are transformed to EPSG:2157. No external dataset downloads are needed.
 
@@ -203,15 +276,13 @@ address geocoder. Three separately labelled popular starting points use publishe
 reference coordinates and are not verified entrances or extra destinations. Their
 sources are recorded in [DATA_SOURCES.md](DATA_SOURCES.md#popular-starting-point-shortcuts-ui-constants-only).
 
-## Project documentation and assessment
+## Project documentation
 
 - [Architecture and request flow](ARCHITECTURE.md)
 - [Database schema and spatial indexes](DATABASE_SCHEMA.md)
 - [API endpoints and spatial-query demonstrations](API.md)
 - [User guide and browser checks](FRONTEND_TESTING.md)
 - [Data sources, licences and import decisions](DATA_SOURCES.md)
-- [Final verification and rubric evidence](FINAL_AUDIT.md)
-- [Submission checklist and five-minute demonstration](SUBMISSION.md)
 
 ### Current application screenshots
 
@@ -231,4 +302,4 @@ no routing geometry or background tiles are mocked in these screenshots.
 - Radius measures distance from the start, not total walking distance. Stop order is deterministic and greedy, not an optimal pedestrian tour.
 - ORS needs an optional private key and internet access. Results/failures are cached only in page memory; provider requests have a 30-second session cooldown. Reloading can issue another request. Routes and visit claims do not verify access, entrances or physical presence.
 - OSM imagery and Swagger UI assets need internet access. The normal interface assets and datasets are bundled. No offline tile download is provided.
-- This Docker setup is verified for local loopback HTTP. Public cloud hosting and HTTPS are not deployed; see the deployment notes in [SUBMISSION.md](SUBMISSION.md).
+- This Docker setup is verified for local loopback HTTP. Public cloud hosting and HTTPS are not deployed; see [Checks and troubleshooting](#checks-and-troubleshooting) for the security limitations.
