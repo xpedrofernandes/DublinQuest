@@ -60,3 +60,7 @@ Thumbs.db
 Desktop.ini
 .idea/
 .vscode/
+
+# Original open-data snapshots and generated qualification output.
+/data/raw/
+/data/qualification.json

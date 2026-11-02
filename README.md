@@ -41,7 +41,7 @@ Adventures and visited stops will be saved for the same browser, without requiri
 
 The initial version focuses on spatial searches, interactive mapping and a complete exploration flow. It won't include live GPS tracking, turn-by-turn navigation or an AI assistant.
 
-The container foundation is running. Adventure features, datasets and the map are still to be implemented.
+The container foundation is running. Adventure features, dataset imports and the map are still to be implemented.
 
 ## Running locally
 
@@ -123,3 +123,7 @@ If a port is occupied, stop the conflicting application or change the published 
 This setup uses `DEBUG=False`, explicit allowed hosts, CSRF middleware, password validators and restricted database credentials. It is intended for a local demonstration over HTTP. The deployment check reports four HTTPS-related warnings: HSTS, HTTPS redirection and secure session/CSRF cookies. Public hosting would require TLS and appropriate proxy/security configuration; it has not been configured or verified. Anonymous adventure mutation protection and ownership checks will be implemented with those endpoints.
 
 Screenshots, data attribution, API documentation and the user guide will be added as the corresponding features are completed.
+
+## Data sources
+
+The four Dublin open-data snapshots have been downloaded and inspected locally. See [DATA_SOURCES.md](DATA_SOURCES.md) for quality findings, attribution and reproduction commands, and [data/sources.json](data/sources.json) for exact resource URLs and SHA-256 checksums. Raw downloads stay outside Git. No attraction data has been imported yet.

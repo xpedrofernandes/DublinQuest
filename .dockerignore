@@ -38,3 +38,5 @@ build
 dist
 tmp
 temp
+data/raw
+data/qualification.json
