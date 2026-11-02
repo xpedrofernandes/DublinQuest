@@ -23,6 +23,8 @@ def main():
         context.route('https://tile.openstreetmap.org/**', lambda route: route.fulfill(status=200, content_type='image/png', body=tile))
         page = context.new_page()
         errors, broken_assets, writes = [], [], []
+        routing_calls = []
+        routing_mode = {'available': True}
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.on('response', lambda response: broken_assets.append(response.url) if '/static/' in response.url and response.status >= 400 else None)
         page.on('request', lambda request: writes.append(request) if '/api/adventures/' in request.url and request.method in ('POST', 'PATCH', 'DELETE') else None)
@@ -66,6 +68,23 @@ def main():
             assert len(result['path']['coordinates']) == 6
             assert len({stop['place']['id'] for stop in result['stops']}) == 5
             assert len({stop['place']['properties']['category'] for stop in result['stops']}) == 4
+            def route_reply(route):
+                routing_calls.append(route.request)
+                if not routing_mode['available']:
+                    route.fulfill(json={'status':'unavailable','detail':'Walking routing is unavailable. Showing the straight-line exploration sequence.'})
+                    return
+                route.fulfill(json={'status':'available','route':result['path'], 'distance_m':1608.1,'duration_s':1157.8,
+                    'notice':'Mock pedestrian estimate; excludes visits. Entrances are not verified.',
+                    'warnings':[], 'waypoints':[{'displacement_m':1.4}]})
+            page.route('**/api/adventures/*/walking-route/', route_reply)
+            click('#walking-route')
+            assert page.locator('#walking-summary').is_visible()
+            assert '19.3 minutes' in page.locator('#walking-metrics').inner_text()
+            assert page.locator('#map path[stroke="#2267bd"]').count() == 1
+            click('#walking-route')
+            assert page.locator('#walking-summary').is_hidden()
+            click('#walking-route')
+            assert len(routing_calls) == 1  # Show/hide reuses the page result.
             assert page.locator('#stop-list > li').count() == 5
             assert page.locator('.quest-pin:not(.start-pin)').count() == 5
             for stop in result['stops']:
@@ -83,9 +102,14 @@ def main():
             page.locator('#stop-list input').first.check()
             idle()
             assert '1 of 5' in page.locator('#progress-label').inner_text()
+            assert page.locator('#walking-summary').is_visible()
+            assert len(routing_calls) == 1
             page.reload(); idle()
             click('#saved-list button')
             assert '1 of 5' in page.locator('#progress-label').inner_text()
+            assert page.locator('#walking-summary').is_hidden()
+            click('#walking-route')
+            assert len(routing_calls) == 2
             page.locator('#stop-list input').first.uncheck(); idle()
             assert '0 of 5' in page.locator('#progress-label').inner_text()
 
@@ -150,6 +174,12 @@ def main():
             click('#regenerate')
             assert page.locator('#stop-list > li').count() == 3
             assert '0 of 3' in page.locator('#progress-label').inner_text()
+            assert page.locator('#walking-summary').is_hidden()
+            assert page.locator('#map path[stroke="#2267bd"]').count() == 0
+            routing_mode['available'] = False
+            click('#walking-route')
+            assert 'straight-line' in page.locator('#feedback').inner_text()
+            assert page.locator('#stop-list > li').count() == 3
             page.once('dialog', lambda dialog: dialog.accept('Renamed browser adventure'))
             click('#rename')
             assert page.locator('#adventure-heading').inner_text() == 'Renamed browser adventure'

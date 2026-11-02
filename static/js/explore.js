@@ -4,8 +4,8 @@
 (() => {
   const $ = id => document.getElementById(id);
   const labels = {street_art: 'Street art', public_art: 'Public art', heritage: 'Heritage', park: 'Parks'};
-  const state = {start: null, adventure: null, csrf: null, busy: false, savedNext: null};
-  let map, startMarker, radiusLayer, adventureLayer, spatialLayer;
+  const state = {start: null, adventure: null, csrf: null, busy: false, savedNext: null, walking: null, walkingVisible: false, geometryKey: null};
+  let map, startMarker, radiusLayer, adventureLayer, spatialLayer, walkingLayer;
   const stopMarkers = new Map();
 
   function node(tag, text, className) {
@@ -112,7 +112,7 @@
     tell(state.adventure ? 'Builder start updated. Generate a new adventure or regenerate the current one to apply it.' : 'Starting point selected. Choose your interests and generate an adventure.');
   }
   function fitResults() {
-    const bounds = L.featureGroup([adventureLayer, spatialLayer]).getBounds();
+    const bounds = L.featureGroup([adventureLayer, spatialLayer, walkingLayer]).getBounds();
     if (startMarker) bounds.extend(startMarker.getLatLng());
     if (bounds.isValid()) map.fitBounds(bounds.pad(.15), {maxZoom: 16});
     else map.setView([53.3498, -6.2603], 13);
@@ -143,6 +143,9 @@
     $('map').scrollIntoView({block: 'center'});
   }
   function renderAdventure(adventure, fit = true, focus = false) {
+    const geometryKey = JSON.stringify([adventure.id, adventure.path, adventure.stops.map(stop => stop.id)]);
+    if (state.geometryKey !== geometryKey) clearWalking();
+    state.geometryKey = geometryKey;
     state.adventure = adventure;
     adventureLayer.clearLayers();
     stopMarkers.clear();
@@ -208,8 +211,28 @@
       content.append(controls, sourceDetails(feature)); card.append(content); list.append(card);
     }
     $('adventure-section').hidden = false; $('welcome').hidden = true;
+    drawWalking();
     if (fit) fitResults();
     if (focus) $('adventure-heading').focus({preventScroll: false});
+  }
+  function clearWalking() {
+    state.walking = null; state.walkingVisible = false;
+    if (walkingLayer) walkingLayer.clearLayers();
+    $('walking-summary').hidden = true;
+    $('walking-route').textContent = 'Show walking route';
+  }
+  function drawWalking() {
+    walkingLayer.clearLayers();
+    const route = state.walking;
+    $('walking-summary').hidden = !route || !state.walkingVisible;
+    $('walking-route').textContent = state.walkingVisible ? 'Hide walking route' : 'Show walking route';
+    if (!route || !state.walkingVisible) return;
+    L.geoJSON(route.route, {style: {color: '#2267bd', weight: 5, opacity: .85}}).addTo(walkingLayer);
+    $('walking-metrics').textContent = `${metres(route.distance_m)} estimated walking distance · ${(route.duration_s / 60).toFixed(1)} minutes walking`;
+    $('walking-notice').textContent = route.notice;
+    const maxSnap = Math.max(...route.waypoints.map(point => point.displacement_m));
+    $('walking-snapping').textContent = `Solid blue line: mapped pedestrian route. Maximum waypoint adjustment: ${maxSnap.toFixed(1)} m. Attraction markers have not moved; adjusted positions are not verified entrances.`;
+    $('walking-warning').textContent = route.warnings.join(' ');
   }
   async function refreshSaved(append = false) {
     const data = await api(append ? state.savedNext : '/api/adventures/');
@@ -302,7 +325,7 @@
     tiles.on('tileerror', () => {
       if (!tileWarning) { tileWarning = true; tell('Some map tiles could not load. Check your internet connection. Place search and adventure controls remain available.', true); }
     });
-    adventureLayer = L.featureGroup().addTo(map); spatialLayer = L.featureGroup().addTo(map);
+    adventureLayer = L.featureGroup().addTo(map); spatialLayer = L.featureGroup().addTo(map); walkingLayer = L.featureGroup().addTo(map);
     L.control.scale({imperial: false}).addTo(map);
     map.on('click', event => { if (!state.busy) chooseStart(event.latlng.lat, event.latlng.lng, 'Map selection', false); });
     $('place-search-form').addEventListener('submit', searchPlaces);
@@ -325,6 +348,20 @@
     });
     $('refresh-saved').addEventListener('click', () => run('Loading saved adventures…', async () => { await refreshSaved(); tell('Saved adventures refreshed.'); }));
     $('more-saved').addEventListener('click', () => run('Loading more adventures…', async () => { await refreshSaved(true); tell('More adventures loaded.'); }));
+    $('walking-route').addEventListener('click', () => {
+      if (!state.adventure || state.busy) return;
+      if (state.walking) {
+        state.walkingVisible = !state.walkingVisible; drawWalking();
+        tell(state.walkingVisible ? 'Walking route shown from this page’s saved result.' : 'Walking route hidden. Showing the straight-line sequence.');
+        return;
+      }
+      run('Requesting an optional walking route…', async () => {
+        const route = await api(`/api/adventures/${state.adventure.id}/walking-route/`, 'POST', {});
+        if (route.status !== 'available') { tell(route.detail); return; }
+        state.walking = route; state.walkingVisible = true; drawWalking(); fitResults();
+        tell('Walking route displayed. Times are estimates and exclude visits; check access yourself.');
+      });
+    });
     $('regenerate').addEventListener('click', () => {
       if (!state.adventure) return;
       if (!window.confirm('Replace the stops using the current builder settings? This resets all visited progress.')) return;
@@ -346,7 +383,7 @@
       if (!window.confirm('Delete this saved adventure? This cannot be undone.')) return;
       run('Deleting adventure…', async () => {
         await api(`/api/adventures/${state.adventure.id}/`, 'DELETE');
-        state.adventure = null; adventureLayer.clearLayers(); stopMarkers.clear(); $('adventure-section').hidden = true; $('welcome').hidden = false;
+        state.adventure = null; clearWalking(); state.geometryKey = null; adventureLayer.clearLayers(); stopMarkers.clear(); $('adventure-section').hidden = true; $('welcome').hidden = false;
         tell('Adventure deleted. Your imported places and parks are unchanged.'); await refreshSaved(); $('saved-heading').scrollIntoView({block: 'center'});
       });
     });

@@ -1,4 +1,5 @@
 import uuid
+import time
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
@@ -18,9 +19,10 @@ from places.serializers import reject_unknown, validate_query
 from .authentication import GuestSessionCSRF
 from .generation import generate_adventure
 from .models import Adventure, AdventureStop
+from .routing import unavailable, walking_route
 from .serializers import (
     AdventureInputSerializer, AdventureSerializer, RegenerateSerializer, RenameSerializer,
-    SavedQuerySerializer, SessionSerializer, StopProgressSerializer,
+    SavedQuerySerializer, SessionSerializer, StopProgressSerializer, WalkingRouteSerializer,
 )
 
 OWNER_KEY = "adventure_owner"
@@ -179,3 +181,21 @@ class AdventureViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         self.get_object().delete()
         return Response(status=204)
+
+    @extend_schema(request=None, responses=WalkingRouteSerializer)
+    @action(detail=True, methods=["post"], url_path="walking-route")
+    def walking_route(self, request, **kwargs):
+        adventure = self.get_object()  # Ownership checked before contacting ORS.
+        reject_unknown(request.data, [])
+        stops = list(adventure.stops.all())
+        if not adventure.path or len(adventure.path.coords) != len(stops) + 1:
+            return Response(unavailable("Regenerate this adventure before requesting a walking route."))
+        # A staff edit may have moved a source place since this path was generated.
+        if any(abs(stop.place.point.x - xy[0]) > .001 or abs(stop.place.point.y - xy[1]) > .001
+                for stop, xy in zip(stops, adventure.path.coords[1:])):
+            return Response(unavailable("An attraction has moved in the data; regenerate the adventure first."))
+        now = time.time()
+        if now - request.session.get("walking_route_requested_at", 0) < 30:
+            return Response(unavailable("Please wait 30 seconds between walking-route requests."))
+        request.session["walking_route_requested_at"] = now
+        return Response(walking_route(adventure.path))

@@ -153,3 +153,40 @@ use mock tiles and do not claim to verify live imagery. Do not add cache-busting
 parameters, spoof headers, proxy requests to evade restrictions, prefetch tiles,
 or run automated real-tile pan/zoom scans. See the official
 [OSMF Tile Usage Policy](https://operations.osmfoundation.org/policies/tiles/).
+
+## Optional walking route
+
+This feature requires your own HeiGIT/openrouteservice key. Set `ORS_API_KEY` in
+the ignored root `.env`, then run `docker compose up -d --wait web` so the container
+receives it. Do not print resolved Compose configuration or share `.env`. With the
+key blank, the complete original adventure experience remains available.
+
+1. Generate the five-stop Thomas Moore/College Green example described above.
+2. Select **Show walking route**. It explicitly sends the waypoint coordinates to
+   HeiGIT through Django. Expect a solid blue route and estimated distance/time;
+   the dashed straight-line sequence remains visible for comparison.
+3. Our live verification returned **1608.1 m / 1157.8 s (19.3 min)** and 99 route
+   vertices. Maximum waypoint adjustment was 2.99 m; Georges Quay was 0.53 m.
+   Results can change with the provider's data. The blue route followed mapped
+   streets and south-bank quays rather than a direct diagonal across the Liffey.
+4. Read the snapping/entrance disclaimer and any provider warning. The verified
+   response warned that road-access-restriction extra information was unavailable.
+   Markers stay at source coordinates; adjusted network positions are not verified
+   entrances. Times exclude visits; this is not live turn-by-turn navigation.
+5. Mark a stop visited. The blue overlay and metrics should remain. Hide/show the
+   route: neither action nor the visited update should make another walking-route
+   request (check Network for `walking-route`).
+6. Regenerate or switch adventures: the blue overlay disappears. The optional
+   button is available again; requesting a new result within 30 seconds can return
+   a cooldown message. Reopening the same unchanged adventure in the same page can
+   reuse its current result; reloading the page discards it.
+7. Without a key, with an unreachable service or with an unroutable waypoint, expect
+   a clear fallback message and a fully usable dashed sequence, cards and progress.
+   Automated tests cover these failures with mocks; do not deliberately spend live
+   quota repeatedly testing provider failures.
+
+All routing calls in `tests/browser/test_explore.py` are intercepted with mock
+responses, just like OSM tiles. Backend routing tests mock the HTTP transport,
+including invalid geometry, snapping, limits, timeouts, ownership and CSRF. The
+single live verification is separate from regression tests. No routing SDK,
+migration or external infrastructure is required.

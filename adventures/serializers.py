@@ -119,3 +119,15 @@ class SavedQuerySerializer(serializers.Serializer):
 
 class SessionSerializer(serializers.Serializer):
     csrfToken = serializers.CharField()
+
+
+class WalkingRouteSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=["available", "unavailable"])
+    detail = serializers.CharField(required=False)
+    route = serializers.JSONField(required=False)
+    distance_m = serializers.FloatField(required=False)
+    duration_s = serializers.FloatField(required=False)
+    waypoints = serializers.ListField(child=serializers.DictField(), required=False)
+    warnings = serializers.ListField(child=serializers.CharField(), required=False)
+    notice = serializers.CharField(required=False)
+    attribution = serializers.CharField(required=False)

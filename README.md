@@ -15,7 +15,7 @@ Instead of following a fixed tour, you choose where to start, what interests you
 
 The map shows the starting point, search area, numbered stops and a suggested sequence connecting them. Each stop includes a description, category and distance information.
 
-The connecting lines show the suggested order of exploration, not walking directions. Distances are straight-line estimates.
+The dashed connecting lines show the suggested exploration order and straight-line distances. An optional **Show walking route** button adds an estimated pedestrian route from openrouteservice/HeiGIT; it leaves the original sequence and stop order unchanged. Walking times exclude visits, and entrances/current access are not verified.
 
 ## Web mapping
 
@@ -161,3 +161,22 @@ Guest sessions can now generate/save adventures, retrieve them, mark stops visit
 The interface uses local Leaflet 1.9.4 and Bootstrap 5.3.8 assets; no frontend build system is required. OpenStreetMap tiles need internet access. Django sends `Referrer-Policy: strict-origin-when-cross-origin` so tile requests identify the application origin without exposing page paths or query strings; normal browser tile caching is preserved. Scroll-wheel map zoom is disabled to make page scrolling easier; use the map zoom controls, keyboard or touch gestures. A place search provides an alternative to choosing a start by clicking the map.
 
 See [FRONTEND_TESTING.md](FRONTEND_TESTING.md) for the full interface walkthrough, or [API.md](API.md#manual-guide-generate-your-first-adventure) to exercise the underlying APIs directly.
+
+## Optional walking routes
+
+The core application needs no routing account. To enable the optional pedestrian
+overlay, obtain a personal key from [HeiGIT](https://account.heigit.org/signup),
+set `ORS_API_KEY` in the ignored root `.env`, and recreate the web container:
+
+```bash
+docker compose up -d --wait web
+```
+
+The key is used exclusively by Django, never JavaScript. Requests send only the
+ordered waypoint coordinates and routing options to HeiGIT. Select **Show walking
+route** after generating or opening an adventure. The solid blue line and estimated
+walking distance/time are separate from the stored straight-line sequence. Provider
+errors, missing configuration or unroutable points fall back without affecting
+saved adventures. Routes are kept only in page memory; visited updates do not
+request them again. See [FRONTEND_TESTING.md](FRONTEND_TESTING.md#optional-walking-route)
+and [API.md](API.md#optional-pedestrian-route).

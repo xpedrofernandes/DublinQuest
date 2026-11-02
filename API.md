@@ -222,3 +222,56 @@ await dqQuestApi('/api/adventures/');
 Expected HTTP 204 and no deleted UUID in the list; its retrieval URL now returns HTTP 404. Source counts remain 922 Places, 484 Parks and four DatasetSources. Existing saved adventures from other sessions are not affected.
 
 The Leaflet map, numbered markers, radius/sequence overlays, builder form, stop cards and visible progress/completion are available at `/`. This console guide remains useful for testing the backend independently; see [FRONTEND_TESTING.md](FRONTEND_TESTING.md) to use the interface.
+
+## Optional pedestrian route
+
+`POST /api/adventures/{uuid}/walking-route/` with `{}` (or an empty body) requests
+one `foot-walking` route through the saved origin and ordered stops. Use the same
+session cookies and `X-CSRFToken` header as other guest mutations. Foreign owners
+get 404; missing CSRF gets 403; GET is not supported. Client coordinates, profiles,
+provider URLs and keys are not accepted. Source places moved since generation
+require regeneration before routing.
+
+The server uses `https://api.heigit.org/openrouteservice/v2/directions/foot-walking/geojson`
+with the optional server-side `ORS_API_KEY`, a 10-second network timeout, six
+waypoints for a five-stop adventure, and a 50 m maximum snapping radius per point.
+There is no optimization, automatic retry, provider switching or redirect following.
+No original geometry, stop order, progress or model is changed.
+
+Successful HTTP 200:
+
+```json
+{
+  "status": "available",
+  "route": {"type": "LineString", "coordinates": [[-6.26, 53.35], [-6.259, 53.35]]},
+  "distance_m": 1608.1,
+  "duration_s": 1157.8,
+  "waypoints": [{"requested": [-6.26, 53.35], "snapped": [-6.26001, 53.35], "displacement_m": 0.67}],
+  "warnings": [],
+  "notice": "Estimated pedestrian route ...",
+  "attribution": "openrouteservice.org | OpenStreetMap contributors"
+}
+```
+
+This is an abbreviated shape example, not an actual complete provider response.
+`route` is EPSG:4326 GeoJSON; waypoint pairs use longitude/latitude. Actual results
+include one snapping entry for every requested waypoint. Distance/time describe
+the snapped network route, exclude visits and do not verify off-network access
+between the original attraction and its snapped point. Card distances remain
+straight-line measurements.
+
+Missing configuration, provider errors/limits, timeout, excessive snapping or an
+invalid response return HTTP 200 with `status: "unavailable"` and a safe `detail`
+message. The adventure remains usable with its original dashed sequence. Provider
+error text, metadata and credentials are never forwarded. A best-effort per-session
+30-second cooldown limits repeated requests; it is not a global quota or abuse
+prevention system. All adventure responses retain private/no-store caching.
+
+The browser stores only the current route result in page memory. Show/hide and
+visited updates reuse it. Switching adventure or regenerating clears it. Reloading
+requires an explicit new request; routes are not persisted to PostgreSQL.
+
+The current URL follows the provider's
+[HeiGIT migration](https://ask.openrouteservice.org/t/deprecating-api-openrouteservice-org-in-favour-of-api-heigit-org/7912).
+See the [official response documentation](https://giscience.github.io/openrouteservice/api-reference/endpoints/directions/requests-and-return-types)
+for geometry, summary and waypoint semantics.
