@@ -4,6 +4,7 @@
 /docs/
 /microsoft/
 /Microsoft/
+/LOCAL_DEVELOPMENT.md
 
 # Local secrets; retain the public configuration template.
 .env

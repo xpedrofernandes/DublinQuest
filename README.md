@@ -1,39 +1,44 @@
-# DublinQuest — Explore Dublin Your Way
+# DublinQuest
 
-DublinQuest is an individual final-year Advanced Web Mapping coursework project at TU Dublin. It will let visitors build personalised Dublin exploration adventures from real geographic data, then view their stops and record progress on an interactive map.
+### Explore Dublin Your Way
 
-## Development status
+DublinQuest is a location-based exploration app I'm developing for CMPU4058 — Advanced Web Mapping at TU Dublin. The idea is to help people discover Dublin through its street art, historic landmarks, public artworks and parks.
 
-Phase 0 is in progress. This first increment establishes the repository and excludes local coursework materials and secrets. **The application and Docker configuration have not been implemented yet.** There are currently no application setup commands or passing application tests to report.
+Instead of following a fixed tour, you choose where to start, what interests you, how far to explore and how many places to visit. DublinQuest will use those choices to put together an adventure on an interactive map.
 
-Development takes place on Windows; the assessment deployment will run on an Apple Silicon Mac. Docker/PostGIS compatibility must be verified on that Mac early in Phase 0, rather than assumed from Windows results.
+## How it will work
 
-## Planned scope
+1. Choose a starting place or click a location on the map.
+2. Select your interests, a search radius and the number of stops.
+3. Explore the suggested stops using the map and an ordered list of places.
+4. Mark stops as visited and keep track of your progress.
 
-- Django, GeoDjango and Django REST Framework backed by PostgreSQL/PostGIS.
-- Leaflet and OpenStreetMap with HTML, CSS, JavaScript and Bootstrap 5.
-- Docker Compose services for Django, PostGIS and pgAdmin, with persistent volumes and a custom network subnet.
-- Real point and polygon datasets, spatial CRUD, and independently demonstrable proximity, containment and buffered-intersection queries.
-- Guest-owned saved adventures, generated sequence LineStrings and manually recorded visited stops.
-- Staff-only management, input validation and CSRF protection for guest mutations.
+The map will show the starting point, search area, numbered stops and a suggested sequence connecting them. Each stop will include a description, category and distance information.
 
-Connecting lines will represent a suggested exploration sequence, not verified pedestrian navigation. AI integration, GPS tracking and turn-by-turn routing are outside the initial scope.
+The connecting lines will show the suggested order of exploration, not walking directions. Distances will be straight-line estimates.
 
-## Repository boundaries
+## Web mapping
 
-The following local folders are intentionally excluded from version control and must remain on the developer's machine:
+The project will use real Dublin open data stored in PostgreSQL/PostGIS. Its spatial features will include:
 
-- `assignment/`
-- `course-materials/`
-- `docs/`
-- `microsoft/` / `Microsoft/`
+- Finding places within a chosen radius.
+- Finding attractions inside a park's boundary.
+- Finding parks and open spaces that overlap the search area.
+- Storing places as points, park boundaries as polygons and adventure sequences as lines.
+- Creating, viewing, editing and deleting spatial records through a staff management interface.
 
-Public project documentation will be maintained at the repository root as the relevant implementation is completed. Local secrets, environments, database-volume directories and generated caches are also excluded. A future `.env.example` will contain placeholders only.
+Adventures and visited stops will be saved for the same browser, without requiring a visitor account.
 
-## Development and submission workflow
+## Technology stack
 
-Changes are developed and checked in small logical increments using descriptive conventional commits. Commits are made locally; **the student manually executes every push**. No automated publishing or deployment is configured.
+- **Backend:** Python, Django, GeoDjango and Django REST Framework
+- **Database:** PostgreSQL with PostGIS
+- **Map:** Leaflet.js and OpenStreetMap
+- **Frontend:** HTML, CSS, JavaScript and Bootstrap 5
+- **Local deployment:** Docker Compose and pgAdmin
 
-The current repository is a personal private repository, not a confirmed GitHub Classroom assignment repository. The student must confirm the submission route and grant the instructor access, or use the Classroom repository if one is subsequently provided. Submission also requires the specified Brightspace package and lab demonstration.
+## Scope
 
-This is original individual coursework. External datasets, libraries and adapted examples must be attributed, and the student must understand and be able to explain the implementation.
+The initial version focuses on spatial searches, interactive mapping and a complete exploration flow. It won't include live GPS tracking, turn-by-turn navigation or an AI assistant.
+
+The application is not runnable yet. Setup instructions and screenshots will be added as development progresses.
