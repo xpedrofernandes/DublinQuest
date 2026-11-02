@@ -6,7 +6,7 @@ from rest_framework.routers import DefaultRouter
 from adventures.views import AdventureViewSet
 from places.views import ParkViewSet, PlaceViewSet
 
-from .views import health
+from .views import explore, health
 
 router = DefaultRouter()
 router.register("places", PlaceViewSet)
@@ -14,6 +14,7 @@ router.register("parks", ParkViewSet)
 router.register("adventures", AdventureViewSet, basename="adventure")
 
 urlpatterns = [
+    path("", explore, name="explore"),
     path("api/", include("adventures.urls")),
     path("api/", include("places.urls")),
     path("api/", include(router.urls)),

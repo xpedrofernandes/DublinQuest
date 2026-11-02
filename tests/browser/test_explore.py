@@ -1,0 +1,176 @@
+"""Optional real-browser smoke test against a populated local Docker application.
+
+Requires Playwright only in the test runner's Python environment, not the app.
+Uses an isolated guest browser context and removes only adventures it creates.
+Run with: python tests/browser/test_explore.py
+"""
+import os
+
+from playwright.sync_api import sync_playwright
+
+BASE = os.environ.get('DQ_TEST_URL', 'http://localhost:8000')
+CHROME = os.environ.get('DQ_CHROME', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
+
+
+def main():
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(executable_path=CHROME, headless=True)
+        context = browser.new_context(viewport={'width': 1440, 'height': 1050})
+        page = context.new_page()
+        errors, broken_assets, writes = [], [], []
+        page.on('pageerror', lambda error: errors.append(str(error)))
+        page.on('response', lambda response: broken_assets.append(response.url) if '/static/' in response.url and response.status >= 400 else None)
+        page.on('request', lambda request: writes.append(request) if '/api/adventures/' in request.url and request.method in ('POST', 'PATCH', 'DELETE') else None)
+
+        def idle():
+            page.wait_for_function("!document.querySelector('main').hasAttribute('aria-busy')")
+
+        def click(selector):
+            page.locator(selector).click()
+            idle()
+
+        def search_start():
+            page.locator('#place-search').fill('Thomas Moore')
+            click('#place-search-form button')
+            assert page.locator('#search-results button').count() > 0
+            click('#search-results button >> nth=0')
+            assert 'Thomas Moore' in page.locator('#start-label').inner_text()
+
+        page.goto(BASE)
+        idle()
+        assert page.title() == 'DublinQuest — Explore Dublin Your Way'
+        assert page.locator('#generate').is_disabled()
+        assert page.locator('.leaflet-control-attribution').is_visible()
+        assert page.locator('.leaflet-tile-loaded').count() > 0, 'OSM tiles did not load'
+        created_id = None
+        try:
+            # Map click, then searchable imported start (no geocoder).
+            page.locator('#map').click(position={'x': 200, 'y': 220})
+            assert 'Map selection' in page.locator('#start-label').inner_text()
+            click('#clear-start')
+            assert page.locator('#generate').is_disabled()
+            search_start()
+            page.locator('#adventure-title').fill('Browser test — temporary')
+            with page.expect_response(lambda response: response.url.endswith('/api/adventures/') and response.request.method == 'POST') as generation:
+                click('#generate')
+            result = generation.value.json()
+            assert generation.value.status == 201, result
+            created_id = result['id']
+            assert len(result['stops']) == 5
+            assert len(result['path']['coordinates']) == 6
+            assert len({stop['place']['id'] for stop in result['stops']}) == 5
+            assert len({stop['place']['properties']['category'] for stop in result['stops']}) == 4
+            assert page.locator('#stop-list > li').count() == 5
+            assert page.locator('.quest-pin:not(.start-pin)').count() == 5
+            for stop in result['stops']:
+                card = page.locator(f'[data-stop-id="{stop["id"]}"]')
+                assert card.locator('h3').inner_text() == stop['place']['properties']['name']
+                assert card.locator('.stop-number').inner_text() == str(stop['position'])
+                # Returned GeoJSON must use Dublin longitude/latitude order.
+                lng, lat = stop['place']['geometry']['coordinates']
+                assert -6.5 < lng < -6.0 and 53.1 < lat < 53.6
+            assert 'not' in page.locator('#sequence-notice').inner_text().lower()
+            click('#stop-list li:first-child .text-button')
+            assert page.locator('.leaflet-popup').is_visible()
+            page.locator('.leaflet-popup-close-button').click()
+
+            page.locator('#stop-list input').first.check()
+            idle()
+            assert '1 of 5' in page.locator('#progress-label').inner_text()
+            page.reload(); idle()
+            click('#saved-list button')
+            assert '1 of 5' in page.locator('#progress-label').inner_text()
+            page.locator('#stop-list input').first.uncheck(); idle()
+            assert '0 of 5' in page.locator('#progress-label').inner_text()
+
+            # All three independent spatial query controls, including pagination.
+            click('#nearby')
+            assert page.locator('#spatial-list > article').count() > 100
+            assert page.locator('#spatial-heading').inner_text() == 'Nearby places'
+            all_nearby_count = page.locator('#spatial-list > article').count()
+            for checkbox in page.locator('[name=category]').all(): checkbox.uncheck()
+            page.locator('[name=category][value=public_art]').check()
+            page.locator('#radius').select_option('500')
+            click('#nearby')
+            assert 0 < page.locator('#spatial-list > article').count() < all_nearby_count
+            assert all('Public art' in card.inner_text() for card in page.locator('#spatial-list > article').all())
+            page.locator('#radius').select_option('2000')
+            for checkbox in page.locator('[name=category]').all(): checkbox.check()
+            assert page.locator('#spatial-section').is_hidden()  # Radius change clears stale results.
+            click('#intersections')
+            assert page.locator('#spatial-list > article').count() > 0
+            assert 'Parks overlapping' in page.locator('#spatial-heading').inner_text()
+            page.locator('#park-search').fill('Merrion')
+            click('#park-search-form button')
+            click('#park-results button >> nth=0')
+            assert 'Inside' in page.locator('#spatial-heading').inner_text()
+            assert page.locator('#spatial-list > article').count() > 0
+
+            # Empty and error feedback keep the current saved adventure intact.
+            page.locator('#place-search').fill('zzzznotarealplace')
+            click('#place-search-form button')
+            assert 'No matching places' in page.locator('#feedback').inner_text()
+            for checkbox in page.locator('[name=category]').all(): checkbox.uncheck()
+            click('#generate')
+            assert 'at least one category' in page.locator('#feedback').inner_text()
+            for checkbox in page.locator('[name=category]').all(): checkbox.check()
+            # Force a demonstrated API validation error without changing backend rules.
+            page.locator('#adventure-title').evaluate('(element) => element.value = "X".repeat(121)')
+            page.locator('#adventure-form').evaluate('(form) => form.dispatchEvent(new Event("submit", {cancelable:true}))')
+            idle()
+            assert page.locator('#feedback').evaluate('(element) => element.classList.contains("error")')
+            page.locator('#adventure-title').fill('Browser test — temporary')
+            click('#refresh-saved')
+
+            # Responsive layouts have no horizontal page overflow.
+            for width, height, name in [(1440, 1050, 'desktop'), (820, 1180, 'tablet'), (390, 844, 'mobile')]:
+                page.set_viewport_size({'width': width, 'height': height})
+                page.wait_for_timeout(250)
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), name
+                assert page.locator('#generate').is_visible()
+                assert page.locator('#map').evaluate('(element) => element.getBoundingClientRect().height') >= 350
+                page.screenshot(path=f'/tmp/dublinquest-{name}.png', full_page=True)
+            page.set_viewport_size({'width': 1440, 'height': 1050})
+            # Actual session isolation and CSRF rejection from separate browser context.
+            other = browser.new_context()
+            assert other.request.get(f'{BASE}/api/adventures/{created_id}/').status == 404
+            assert other.request.get(f'{BASE}/api/adventures/').json()['count'] == 0
+            other.close()
+            assert context.request.delete(f'{BASE}/api/adventures/{created_id}/').status == 403
+
+            # Regenerate with changed settings, preserving UUID and clearing visits.
+            page.locator('#stop-count').fill('3')
+            page.once('dialog', lambda dialog: dialog.accept())
+            click('#regenerate')
+            assert page.locator('#stop-list > li').count() == 3
+            assert '0 of 3' in page.locator('#progress-label').inner_text()
+            page.once('dialog', lambda dialog: dialog.accept('Renamed browser adventure'))
+            click('#rename')
+            assert page.locator('#adventure-heading').inner_text() == 'Renamed browser adventure'
+            for checkbox in page.locator('#stop-list input').all():
+                checkbox.check(); idle()
+            assert page.locator('#completion').is_visible()
+            # Show a server/network failure without losing the adventure.
+            page.route('**/api/adventures/?*', lambda route: route.abort())
+            page.route('**/api/adventures/', lambda route: route.abort())
+            click('#refresh-saved')
+            assert 'Unable to reach' in page.locator('#feedback').inner_text()
+            page.unroute('**/api/adventures/?*'); page.unroute('**/api/adventures/')
+            assert writes and all(request.headers.get('x-csrftoken') for request in writes)
+            assert not errors, errors
+            assert not broken_assets, broken_assets
+            page.once('dialog', lambda dialog: dialog.accept())
+            click('#delete-adventure')
+            assert page.locator('#adventure-section').is_hidden()
+            assert context.request.get(f'{BASE}/api/adventures/{created_id}/').status == 404
+            created_id = None
+            print('PASS: map/search, generation, cards/markers, three spatial controls, progress, reload, guest/CSRF, validation, responsive layouts, regeneration, rename, completion, deletion; no JS errors or failed static assets.')
+        finally:
+            if created_id:
+                token = context.request.get(f'{BASE}/api/session/').json()['csrfToken']
+                context.request.delete(f'{BASE}/api/adventures/{created_id}/', headers={'X-CSRFToken': token, 'Referer': BASE + '/'})
+            context.close(); browser.close()
+
+
+if __name__ == '__main__':
+    main()

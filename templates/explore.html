@@ -1,0 +1,73 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Build a personal Dublin adventure with real public art, heritage and parks.">
+  <title>DublinQuest — Explore Dublin Your Way</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap/bootstrap.min.css' %}">
+  <link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">
+  <link rel="stylesheet" href="{% static 'css/explore.css' %}">
+  <script defer src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
+  <script defer src="{% static 'js/explore.js' %}"></script>
+</head>
+<body>
+<a class="skip-link" href="#builder">Skip to adventure builder</a>
+<header class="site-header">
+  <a class="brand" href="/" aria-label="DublinQuest home"><span class="brand-icon" aria-hidden="true">DQ</span>Dublin<span>Quest</span></a>
+  <nav aria-label="Main navigation"><a href="#builder">Explore</a><a href="#saved-section">Saved adventures</a><a href="#about-data">About the data</a></nav>
+</header>
+<main class="container-fluid page-shell">
+  <section class="intro" aria-labelledby="page-title"><div><p class="eyebrow">YOUR CITY. YOUR CURIOSITY.</p><h1 id="page-title">Take the curious way around.</h1><p>Street art, hidden history and a little green space. Make your next Dublin discovery your own.</p></div><span class="city-tag">DUBLIN, IRELAND <span aria-hidden="true">↗</span></span></section>
+  <div id="feedback" class="feedback" role="status" aria-live="polite" aria-atomic="true" tabindex="-1">Choose a starting point to begin.</div>
+  <noscript><p class="alert alert-warning">JavaScript is needed for the map and adventure controls.</p></noscript>
+  <div class="explore-layout">
+    <aside class="builder-panel panel" id="builder" aria-labelledby="builder-title">
+      <p class="eyebrow">01 / MAKE IT YOURS</p><h2 id="builder-title">Build your adventure</h2>
+      <form id="place-search-form" role="search">
+        <label for="place-search" class="form-label">Find a starting place</label>
+        <div class="input-group"><input id="place-search" class="form-control" type="search" maxlength="100" placeholder="Try Thomas Moore or Merrion" required><button class="btn btn-outline-dark" type="submit">Search</button></div>
+        <p class="hint">Search our imported places, or click anywhere on the map.</p>
+      </form>
+      <div id="search-results" class="search-results" aria-live="polite"></div>
+      <form id="adventure-form">
+        <div class="start-summary"><span class="mini-label">STARTING POINT</span><output id="start-label">No location selected</output><button id="clear-start" type="button" class="text-button" hidden>Clear</button></div>
+        <div class="mb-3"><label for="adventure-title" class="form-label">Adventure name <span class="optional">(optional)</span></label><input id="adventure-title" class="form-control" maxlength="120" placeholder="My Dublin discovery"></div>
+        <fieldset class="mb-3"><legend class="form-label">What catches your eye?</legend>
+          <div class="category-options">
+            <label class="category-option street_art"><input type="checkbox" name="category" value="street_art" checked> Street art</label>
+            <label class="category-option public_art"><input type="checkbox" name="category" value="public_art" checked> Public art</label>
+            <label class="category-option heritage"><input type="checkbox" name="category" value="heritage" checked> Heritage</label>
+            <label class="category-option park"><input type="checkbox" name="category" value="park" checked> Parks</label>
+          </div>
+        </fieldset>
+        <div class="row g-3 mb-3"><div class="col-6"><label for="radius" class="form-label">Search radius</label><select id="radius" class="form-select"><option value="500">500 m</option><option value="1000">1 km</option><option value="2000" selected>2 km</option><option value="3000">3 km</option><option value="5000">5 km</option></select></div><div class="col-6"><label for="stop-count" class="form-label">Number of stops</label><input id="stop-count" class="form-control" type="number" min="1" max="10" value="5" required></div></div>
+        <button id="generate" class="btn btn-quest w-100" type="submit" disabled>Generate adventure <span aria-hidden="true">↗</span></button>
+        <p class="hint mt-2">Automatically saved in this browser. No account needed.</p>
+      </form>
+      <details class="spatial-tools" open><summary>Explore the spatial data</summary><p class="hint">Use the selected start, radius and categories to discover what is nearby.</p>
+        <div class="d-grid gap-2"><button id="nearby" type="button" class="btn btn-outline-dark" disabled>Find nearby places</button><button id="intersections" type="button" class="btn btn-outline-dark" disabled>Find parks overlapping radius</button></div>
+        <form id="park-search-form" class="mt-3"><label for="park-search" class="form-label">Find places inside a park</label><div class="input-group"><input id="park-search" class="form-control" type="search" placeholder="Try Merrion" maxlength="100" required><button type="submit" class="btn btn-outline-dark">Find park</button></div></form>
+        <div id="park-results" class="search-results"></div>
+      </details>
+    </aside>
+    <section class="map-and-results" aria-label="Map and adventure results">
+      <div class="map-frame panel"><div class="map-heading"><span><span class="live-dot" aria-hidden="true"></span> Your Dublin canvas</span><button id="fit-map" type="button" class="text-button">Fit results</button></div><div id="map" aria-label="Interactive Dublin map. Click to choose your starting point. Use place search as a keyboard alternative."></div><div class="map-caption"><span><b>S</b> Start</span><span><b>1</b> Adventure stop</span><span class="map-note">Click the map to choose a start</span></div></div>
+      <section id="adventure-section" class="panel adventure-panel" aria-labelledby="adventure-heading" hidden>
+        <div class="section-top"><div><p class="eyebrow">02 / FOLLOW YOUR CURIOSITY</p><h2 id="adventure-heading" tabindex="-1"></h2></div><span id="distance-summary" class="distance-summary"></span></div>
+        <p id="sequence-notice" class="notice"></p><div id="adventure-warnings" class="notice warning" hidden></div>
+        <div class="progress-heading"><label for="adventure-progress">Your progress</label><span id="progress-label"></span></div><progress id="adventure-progress" max="100" value="0"></progress><p id="completion" class="completion" hidden>Adventure complete. A little more of Dublin, discovered.</p>
+        <ol id="stop-list" class="stop-list"></ol>
+        <div class="adventure-actions"><button id="regenerate" type="button" class="btn btn-outline-dark">Regenerate with form settings</button><button id="rename" type="button" class="text-button">Rename</button><button id="delete-adventure" type="button" class="text-button danger">Delete adventure</button></div>
+      </section>
+      <section id="spatial-section" class="panel adventure-panel" aria-labelledby="spatial-heading" hidden><div class="section-top"><h2 id="spatial-heading" tabindex="-1">Spatial results</h2><button id="clear-spatial" type="button" class="text-button">Clear layer</button></div><p id="spatial-summary" class="hint"></p><div id="spatial-list" class="spatial-list"></div></section>
+      <section class="empty-panel" id="welcome"><span class="empty-symbol" aria-hidden="true">↗</span><div><h2>A few stops. A fresh perspective.</h2><p>Pick a start, choose your interests and see where Dublin takes you.</p></div></section>
+    </section>
+  </div>
+  <section id="saved-section" class="panel saved-panel" aria-labelledby="saved-heading"><div class="section-top"><div><p class="eyebrow">PICK UP WHERE YOU LEFT OFF</p><h2 id="saved-heading">Your saved adventures</h2></div><button id="refresh-saved" type="button" class="btn btn-outline-dark">Refresh saved</button></div><p class="hint">Saved for this browser session. Clearing cookies or switching browser profiles removes access.</p><div id="saved-list" class="saved-list"></div><button id="more-saved" type="button" class="btn btn-outline-dark mt-3" hidden>Load more adventures</button></section>
+  <footer id="about-data"><h2>Real places. Open data.</h2><p>Third-party geographic data published by Dublin City Council through Smart Dublin: Dublin Canvas, Public Artworks DCC, Heritage Sites, Historic Monuments and Government Buildings, and Parks and Open Spaces DCC 2016. Creative Commons Attribution, as recorded by the publisher; the catalogue does not specify a licence version. Dataset snapshots are historical, not live opening or access information.</p><p><a href="https://data.smartdublin.ie/organization/dublin-city-council" target="_blank" rel="noopener noreferrer">Dublin City Council on Smart Dublin</a> · <a href="http://www.opendefinition.org/licenses/cc-by" target="_blank" rel="noopener noreferrer">Dataset licence</a> · Map © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a></p><p>Park points represent locations within boundaries, not verified entrances. Check access and conditions yourself. Suggested connections are straight lines, not walking directions.</p><p class="footer-brand">DublinQuest — Explore Dublin Your Way</p></footer>
+</main>
+</body>
+</html>

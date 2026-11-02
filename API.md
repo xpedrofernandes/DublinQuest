@@ -1,6 +1,6 @@
 # DublinQuest API
 
-The places/parks REST API provides staff spatial CRUD and three spatial searches. Guest adventure generation, ownership, progress and LineString creation/regeneration are described in the adventure section below. No frontend map has been added yet.
+The places/parks REST API provides staff spatial CRUD and three spatial searches. Guest adventure generation, ownership, progress and LineString creation/regeneration are described in the adventure section below. The Leaflet interface is available at `/`; see [FRONTEND_TESTING.md](FRONTEND_TESTING.md) for its browser walkthrough.
 
 ## Contract
 
@@ -36,7 +36,7 @@ Write bodies are ordinary JSON objects, rather than GeoJSON Features. POST creat
 
 `categories` is a comma-separated list of distinct values: `street_art,public_art,heritage,park`. Blank/unknown/duplicate categories are invalid. `lat` is -90..90, `lng` is -180..180; coordinates must be finite and transformable to EPSG:2157. Radius is an integer 250..5000 metres, default 2000. Search text is nonblank, at most 100 characters. Unsupported/repeated parameters and invalid page sizes return 400. A page beyond available results returns 404. DRF's standard `format=json` parameter and `.json` suffix are supported.
 
-Public listings/details exclude inactive places/parks; inactive park representatives are hidden too. Staff can read inactive records for management. Park containment returns active non-park attractions, excluding the park's own derived representative point. Proximity includes a record at the origin if it matches; future adventure generation must explicitly exclude coincident origin stops.
+Public listings/details exclude inactive places/parks; inactive park representatives are hidden too. Staff can read inactive records for management. Park containment returns active non-park attractions, excluding the park's own derived representative point. Proximity includes a record at the origin if it matches; adventure generation explicitly excludes coincident origin stops.
 
 Direct writes/deletes of park representative places are rejected. Manage the park instead: creating a boundary creates its Place; boundary/name/active updates synchronize that Place atomically; park deletion removes it unless saved-adventure references prevent deletion. Invalid boundaries are rejected, never silently repaired. Re-running an import can restore imported fields after staff edits, as documented in README.
 
@@ -50,7 +50,7 @@ Direct writes/deletes of park representative places are rejected. Manage the par
 
 The intersection response additionally contains `search_area`, an EPSG:4326 Polygon for Leaflet. PostGIS's default buffer approximates a circle with straight segments, so this polygon is the exact intersection contract; it is not a mathematically perfect geodesic circle. Proximity uses `ST_DWithin` directly rather than that approximation.
 
-These are three independently callable, meaningful spatial queries for the assignment. Their obvious frontend controls will be implemented later. The implementation is conventional viewsets/serializers/ORM; the small parameterized SQL helper constructs the PostGIS buffer. It interpolates no SQL from user text. Indexed geometry columns stay in EPSG:2157; input parameters are transformed before filtering, preserving GiST usability. Only response copies transform to 4326.
+These are three independently callable, meaningful spatial queries for the assignment. The frontend exposes them as Find nearby places, Find parks overlapping radius, and Find places inside a park. The implementation is conventional viewsets/serializers/ORM; the small parameterized SQL helper constructs the PostGIS buffer. It interpolates no SQL from user text. Indexed geometry columns stay in EPSG:2157; input parameters are transformed before filtering, preserving GiST usability. Only response copies transform to 4326.
 
 EXPLAIN checks against the imported data on 2 November 2026 showed bitmap index scans on the Place point GiST index for 1 km proximity (93 matches) and Merrion containment (9), and on the Park boundary GiST index for 1 km intersection (27). Exact filters follow the index bounding-box prefilter. Distance sorting still needs a sort. Plans depend on table statistics/radius; do not claim every query must use an index or that these counts are a performance benchmark.
 
@@ -221,4 +221,4 @@ await dqQuestApi('/api/adventures/');
 
 Expected HTTP 204 and no deleted UUID in the list; its retrieval URL now returns HTTP 404. Source counts remain 922 Places, 484 Parks and four DatasetSources. Existing saved adventures from other sessions are not affected.
 
-The Leaflet map, numbered markers, visible radius/sequence overlays, builder form, stop cards and graphical progress/completion will become visible in Phase 5. For now, JSON and the console table demonstrate the complete backend flow.
+The Leaflet map, numbered markers, radius/sequence overlays, builder form, stop cards and visible progress/completion are available at `/`. This console guide remains useful for testing the backend independently; see [FRONTEND_TESTING.md](FRONTEND_TESTING.md) to use the interface.

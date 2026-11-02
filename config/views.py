@@ -2,9 +2,15 @@ import logging
 
 from django.db import DatabaseError, connection
 from django.http import JsonResponse
+from django.shortcuts import render
 from django.views.decorators.http import require_safe
 
 logger = logging.getLogger(__name__)
+
+
+@require_safe
+def explore(request):
+    return render(request, "explore.html")
 
 
 @require_safe
