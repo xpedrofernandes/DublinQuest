@@ -41,7 +41,7 @@ Adventures and visited stops will be saved for the same browser, without requiri
 
 The initial version focuses on spatial searches, interactive mapping and a complete exploration flow. It won't include live GPS tracking, turn-by-turn navigation or an AI assistant.
 
-The container foundation is running. The datasets can be imported into PostGIS. Adventure features and the map are still to be implemented.
+The container foundation is running. The datasets can be imported into PostGIS. Guest adventure generation, saving and progress APIs are implemented. The interactive map and user interface are still to be implemented.
 
 ## Running locally
 
@@ -78,7 +78,7 @@ The root URL has no application page yet. `/health/` checks database connectivit
 - `docker/db/`: first-run SQL that creates a restricted application database role.
 - `static/`: source assets; collected output stays inside the web container.
 
-The initial spatial schema is implemented in `places` and `adventures`; see [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) for fields, relationships, CRS handling and database-backed test commands. Migrations are applied explicitly during setup. Dataset import commands are available below; the places/parks endpoints and spatial searches are documented in [API.md](API.md). Adventure endpoints and the map are still to be added.
+The initial spatial schema is implemented in `places` and `adventures`; see [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) for fields, relationships, CRS handling and database-backed test commands. Migrations are applied explicitly during setup. Dataset import commands are available below; the places/parks endpoints and spatial searches are documented in [API.md](API.md). Guest adventure endpoints are also available; the map is still to be added.
 
 ## Containers and persistence
 
@@ -150,3 +150,8 @@ Re-running these commands updates the same source-keyed records rather than crea
 ## Spatial API
 
 Public GeoJSON endpoints provide place/park listings, category filters, proximity searches, park containment and buffered-area intersection. Spatial writes require an active staff account and session CSRF protection. See [API.md](API.md) for endpoints, example requests, expected Dublin results and manual CRUD tests. Interactive API documentation is available at http://localhost:8000/api/docs/.
+
+
+## Your first adventure
+
+Guest sessions can now generate/save adventures, retrieve them, mark stops visited, regenerate their straight-line sequence and delete them. No visitor account is needed. The algorithm selects real nearby places with category variety and a deterministic nearest-next order; it does not calculate walking routes. Follow the beginner-friendly guest adventure guide in [API.md](API.md#manual-guide-generate-your-first-adventure) to try the College Green/Trinity-area example through the APIs before the Leaflet interface is added.

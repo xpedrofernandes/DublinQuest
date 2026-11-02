@@ -16,7 +16,7 @@ class Adventure(models.Model):
     radius_m = models.PositiveIntegerField(default=2000, validators=[MinValueValidator(250), MaxValueValidator(5000)])
     categories = models.JSONField(default=list)
     requested_stops = models.PositiveSmallIntegerField(default=5, validators=[MinValueValidator(1), MaxValueValidator(10)])
-    # Filled by adventure generation later; NULL distinguishes an ungenerated record.
+    # Filled by adventure generation; NULL distinguishes an ungenerated record.
     search_area = models.PolygonField(srid=2157, spatial_index=True, null=True, blank=True, validators=[validate_geometry])
     path = models.LineStringField(srid=2157, spatial_index=True, null=True, blank=True, validators=[validate_geometry])
     created_at = models.DateTimeField(auto_now_add=True)

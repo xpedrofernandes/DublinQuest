@@ -1,6 +1,6 @@
 # DublinQuest API
 
-The places/parks REST API provides staff spatial CRUD and three spatial searches. Adventure generation, guest-owned adventure endpoints and progress updates are not yet available; LineString creation/regeneration is not implemented by the endpoints below. No frontend map has been added yet.
+The places/parks REST API provides staff spatial CRUD and three spatial searches. Guest adventure generation, ownership, progress and LineString creation/regeneration are described in the adventure section below. No frontend map has been added yet.
 
 ## Contract
 
@@ -110,6 +110,115 @@ await dqApi(`/api/places/?search=Renamed%20temporary%20API%20test%20park`, 'GET'
 await dqApi(`/api/parks/${dqTestPark.id}/`, 'DELETE');
 ```
 
-Expected 201, 200, a collection with one synchronized representative Place, then 204. That representative Place must disappear after deleting the park. A self-intersecting MultiPolygon must return 400. Deleting a Place already used by an AdventureStop is automatically tested to return 409; end-user adventure creation will be available in the next milestone.
+Expected 201, 200, a collection with one synchronized representative Place, then 204. That representative Place must disappear after deleting the park. A self-intersecting MultiPolygon must return 400. Deleting a Place already used by an AdventureStop is automatically tested to return 409; guest adventure creation is available in the adventure section below.
 
 Automated verification: `docker compose run --rm web python manage.py test places adventures config --keepdb`; provision the separate test database first as described in DATABASE_SCHEMA.md. Tests check metric/boundary accuracy, touching/intersection-vs-bbox behavior, pagination/GeoJSON, malformed input, source-field protection, nonstaff/anonymous denial, session CSRF and synchronized CRUD. Swagger is at `/api/docs/`, with machine-readable schema `/api/schema/`.
+
+
+## Guest adventure API
+
+No account or staff login is required. `GET /api/session/` establishes a database-backed Django session and returns a masked `csrfToken`; the browser stores its HttpOnly session cookie. Every guest POST/PATCH/DELETE enforces Django CSRF, including anonymous requests. Send that token in `X-CSRFToken` with the same session/CSRF cookies. Login is not the ownership mechanism: each browser session has a server-generated guest owner UUID, never accepted from a request body or returned in adventure responses. Staff cannot use this API to read another guest's adventures.
+
+| Method/path (under `/api/`) | Body and result |
+|---|---|
+| GET `session/` | Initialize/reuse guest session; returns `{"csrfToken":"..."}` |
+| POST `adventures/` | Generate and save; required lat/lng/categories; optional title, radius_m (2000), stop_count (5); returns 201 |
+| GET `adventures/` | Current guest's saved adventures; count/next/previous/results pagination, default 10 / maximum 50; optional search/page/page_size |
+| GET `adventures/{id}/` | One owned adventure and ordered stops, 200; missing or another guest's ID is 404 |
+| PATCH `adventures/{id}/` | Rename only: `{"title":"New title"}`; keeps geometry/visited progress |
+| PATCH `adventures/{id}/stops/{stop_id}/` | `{"visited":true}` or false; returns updated full adventure/progress |
+| POST `adventures/{id}/regenerate/` | Optional changed generation fields; omitted values use existing criteria. Empty `{}` reruns the same criteria. Requires `confirm_reset:true` if any stop has been visited |
+| DELETE `adventures/{id}/` | Delete own adventure/stops, 204; does not delete any source Place/Park |
+
+Generation validation uses the existing spatial API's finite/range/transformation checks. Radius: 250–5000 metres, desired stops: 1–10, one to four distinct supported category codes, nonblank title up to 120 characters. Unknown/server-owned fields, malformed input and no eligible results return HTTP 400. A valid request with fewer eligible locations saves the available stops and returns a warning; it never silently widens the radius. At least one stop is required to save a nonempty LineString. Missing/invalid CSRF returns HTTP 403 before mutation. A stop belonging to a different adventure returns HTTP 404 even if both adventures belong to the same guest. PUT is not supported: use PATCH to rename or POST regenerate to change criteria.
+
+Responses contain UUID id, title, start Point, radius_m, categories, requested_stops, search_area Polygon, path LineString, stops, progress, warnings, total_distance_m and sequence_notice. Geometry is EPSG:4326 GeoJSON, with 2157 storage. Every stop has id, position, a source-attributed Place Feature, straight-line distances from the start/previous stop, visited boolean and visited_at. The embedded Place's nullable distance_m remains the place API's optional annotation; use the explicit stop distance fields here. No owner UUID is exposed.
+
+Progress uses actual saved stop count: `{"visited":1,"total":5,"percent":20.0,"complete":false}`. Repeated visited=true preserves its original timestamp; false clears it. Completion means all actual stops are visited, including a shorter adventure saved with a warning. Rename preserves progress. Successful regeneration keeps adventure UUID/owner but replaces stop IDs, recomputes geometry/distances and resets visits; old stop URLs then return404. Failed regeneration leaves the previous adventure/stops/progress intact. Mutation transactions lock the owned Adventure row to serialize progress/regeneration/deletion on that adventure. Responses are private/no-store.
+
+### Selection algorithm
+
+`adventures/generation.py` reuses the indexed PostGIS proximity search, active/category filters and park-active exclusion. Candidates are nearest-first with PK tie-breaking. It excludes a location coincident with the start within 1 mm and deduplicates candidate coordinates at millimetre precision for selection only; original data/coordinates are not edited.
+
+It reserves the nearest candidate of each available category; if there are fewer requested slots than categories, categories with nearer representatives win. Remaining slots take the nearest unused candidates. It then orders at most ten selected places using a simple greedy nearest-next distance, with PK tie-breaking. The starting point and ordered stop coordinates form the stored LineString; PostGIS constructs the stored search buffer. Identical criteria and unchanged database records give the same stop selection/order, independent of category-input order or session identity. This is understandable category variety plus proximity, not optimal route planning, walking navigation, travel time or access verification. Distances from the origin need not increase along the nearest-next sequence.
+
+No new models or dependencies were introduced. Search radius applies to distance from the start, not to total sequence length. Geometry/distances describe generation time; related Place metadata is live. If staff later move a source Place, regenerate the adventure to refresh its sequence/distances. The saved LineString is not silently rewritten by staff place edits. Park representative points remain explicitly labelled as not verified entrances.
+
+Sessions persist across requests/container restarts using the existing database volume. Two tabs sharing the session share adventures. Clearing browser cookies, session expiry, Django logout (which flushes the session), or switching browser profiles loses access; there is no account recovery or cross-browser sharing in this scope. CSRF bootstrap must be repeated after a login rotates its token. There is no separate unsaved preview endpoint: POST generation saves immediately.
+
+### Manual guide: generate your first adventure
+
+1. Open `http://localhost:8000/api/session/?format=json` in your normal browser. A csrfToken should appear. No login is needed.
+2. Open developer tools and select Console (Chrome/Edge on macOS: Cmd+Option+J). Keep the page on localhost:8000 so the requests below use the same cookies.
+3. Paste the following block. It obtains a fresh token, defines a small request helper and generates a five-stop adventure.
+
+```javascript
+window.dqGuest = await fetch('/api/session/', {cache: 'no-store', credentials: 'same-origin'}).then(r => r.json());
+window.dqQuestApi = async (url, method = 'GET', body) => {
+  const response = await fetch(url, {method, cache: 'no-store', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-CSRFToken': dqGuest.csrfToken}, body: body === undefined ? undefined : JSON.stringify(body)});
+  const data = response.status === 204 ? null : await response.json();
+  console.log(response.status, data);
+  if (!response.ok) throw new Error('Inspect the response above before continuing');
+  return data;
+};
+window.dqAdventure = await dqQuestApi('/api/adventures/', 'POST', {
+  title: 'College Green discovery',
+  lat: 53.34516502,
+  lng: -6.258924007,
+  categories: ['street_art', 'heritage', 'public_art', 'park'],
+  radius_m: 2000,
+  stop_count: 5
+});
+console.table(dqAdventure.stops.map(s => ({position: s.position, name: s.place.properties.name, category: s.place.properties.category, fromStartMetres: s.distance_from_start_m, fromPreviousMetres: s.distance_from_previous_m})));
+```
+
+The starting coordinates are copied from the imported Thomas Moore Statue point near Trinity/College Green, not the quarantined Trinity point and not a verified campus entrance. Check the source using `http://localhost:8000/api/places/?search=Thomas%20Moore%20Statue&format=json`.
+
+Expected: HTTP 201, five distinct stops with positions 1–5, coverage of all four categories for this example, requested_stops: 5, radius_m: 2000, progress 0/5, and a LineString with six coordinate pairs (origin plus five stops). Each distance_from_start_m should be at most 2000 metres. Thomas Moore Statue itself is excluded as coincident with the origin. Every stop's source metadata points back to the bundled dataset; parks carry a representative-point warning. `sequence_notice` explicitly rejects pedestrian-routing claims. With the unchanged bundled data, the observed sequence is Normal People (street art), Henry Grattan Statue (public art), Stein Sculpture (public art), Georges Quay (park representative) and Hapenny Bridge (heritage). These names preserve the source spelling. Copy the returned adventure UUID for later retrieval.
+
+List and retrieve it, then reload the browser page and verify the same UUID is still listed:
+
+```javascript
+await dqQuestApi('/api/adventures/');
+await dqQuestApi(`/api/adventures/${dqAdventure.id}/`);
+```
+
+After reload, redefine the helper/bootstrap block if the console variables were lost; use the existing UUID or recover it from `http://localhost:8000/api/adventures/?format=json`. Do not re-run the POST unless you want another saved adventure. The literal retrieval URL is `http://localhost:8000/api/adventures/ADVENTURE_UUID/?format=json`, replacing ADVENTURE_UUID with your returned id.
+
+Visit and unvisit a stop:
+
+```javascript
+await dqQuestApi(`/api/adventures/${dqAdventure.id}/stops/${dqAdventure.stops[0].id}/`, 'PATCH', {visited: true});
+await dqQuestApi(`/api/adventures/${dqAdventure.id}/`);
+await dqQuestApi(`/api/adventures/${dqAdventure.id}/stops/${dqAdventure.stops[0].id}/`, 'PATCH', {visited: false});
+```
+
+Expected progress 1/5 (20%) then 0/5, with visited_at populated then cleared. Mark all five visited to see complete=true and 100%; this is the backend completion state, not a graphical completion screen yet.
+
+Rename without resetting progress, then regenerate with explicit reset confirmation:
+
+```javascript
+await dqQuestApi(`/api/adventures/${dqAdventure.id}/`, 'PATCH', {title: 'My first DublinQuest'});
+window.dqAdventure = await dqQuestApi(`/api/adventures/${dqAdventure.id}/regenerate/`, 'POST', {categories: ['heritage', 'public_art'], stop_count: 3, confirm_reset: true});
+```
+
+Expected HTTP 200, same adventure UUID, three newly numbered stops/new stop IDs, a four-vertex LineString and progress 0/3. Use the updated dqAdventure.stops from now on. If a stop was visited, omitting confirm_reset must return HTTP 400; the previous adventure remains intact. Supplying an impossible search (e.g. lat54/lng-7/radius250) also returns HTTP 400 without destroying the prior adventure.
+
+For ownership, open a separate browser profile or a private window independent of your original normal window. Visit `/api/session/?format=json` there, then open your original adventure's exact retrieval URL: expect HTTP 404, while `/api/adventures/?format=json` is empty. New private windows can share cookies with other private windows; two tabs in the same session are not independent guests. Never copy cookies between the sessions.
+
+To check anonymous CSRF, in your original console omit the CSRF header:
+
+```javascript
+console.log((await fetch(`/api/adventures/${dqAdventure.id}/`, {method: 'DELETE', credentials: 'same-origin'})).status);
+```
+
+Expected HTTP 403 and the adventure must remain. With your normal helper, deliberately delete it when finished:
+
+```javascript
+await dqQuestApi(`/api/adventures/${dqAdventure.id}/`, 'DELETE');
+await dqQuestApi('/api/adventures/');
+```
+
+Expected HTTP 204 and no deleted UUID in the list; its retrieval URL now returns HTTP 404. Source counts remain 922 Places, 484 Parks and four DatasetSources. Existing saved adventures from other sessions are not affected.
+
+The Leaflet map, numbered markers, visible radius/sequence overlays, builder form, stop cards and graphical progress/completion will become visible in Phase 5. For now, JSON and the console table demonstrate the complete backend flow.
