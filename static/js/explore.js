@@ -4,8 +4,9 @@
 (() => {
   const $ = id => document.getElementById(id);
   const labels = {street_art: 'Street art', public_art: 'Public art', heritage: 'Heritage', park: 'Parks'};
-  const state = {start: null, adventure: null, csrf: null, busy: false, savedNext: null, walking: null, walkingVisible: false, geometryKey: null};
-  let map, startMarker, radiusLayer, adventureLayer, spatialLayer, walkingLayer;
+  const state = {start: null, adventure: null, csrf: null, busy: false, savedNext: null, walking: null, walkingVisible: false, geometryKey: null, walkingLoading: false, walkingDetail: null};
+  let map, startMarker, radiusLayer, adventureLayer, spatialLayer, walkingLayer, straightLayer;
+  const walkingCache = new Map();
   const stopMarkers = new Map();
 
   function node(tag, text, className) {
@@ -64,6 +65,7 @@
       document.querySelector('main').removeAttribute('aria-busy');
       state.busy = false;
       updateStartControls();
+      drawWalking();
     }
   }
   function updateStartControls() {
@@ -142,9 +144,15 @@
     marker.openPopup();
     $('map').scrollIntoView({block: 'center'});
   }
-  function renderAdventure(adventure, fit = true, focus = false) {
-    const geometryKey = JSON.stringify([adventure.id, adventure.path, adventure.stops.map(stop => stop.id)]);
-    if (state.geometryKey !== geometryKey) clearWalking();
+  function renderAdventure(adventure, fit = true, focus = false, openWalking = false) {
+    const geometryKey = JSON.stringify([adventure.id, adventure.path, adventure.stops.map(stop => [stop.id, stop.place.geometry])]);
+    const changed = state.geometryKey !== geometryKey;
+    if (changed) {
+      clearWalking();
+      for (const [key, entry] of walkingCache) {
+        if (entry.id === adventure.id && key !== geometryKey) walkingCache.delete(key);
+      }
+    }
     state.geometryKey = geometryKey;
     state.adventure = adventure;
     adventureLayer.clearLayers();
@@ -162,7 +170,7 @@
     $('stop-count').value = adventure.requested_stops;
     document.querySelectorAll('[name="category"]').forEach(input => { input.checked = adventure.categories.includes(input.value); });
     drawStart();
-    L.geoJSON(adventure.path, {style: {color: '#204a3b', weight: 3, dashArray: '7 7', opacity: .8}}).addTo(adventureLayer);
+    straightLayer = L.geoJSON(adventure.path, {style: {color: '#204a3b', weight: 3, dashArray: '7 7', opacity: .8}}).addTo(adventureLayer);
     // Use the actual server buffer, rather than treating a browser circle as a spatial query.
     if (radiusLayer) map.removeLayer(radiusLayer);
     radiusLayer = L.geoJSON(adventure.search_area, {style: {color: '#58774b', weight: 1.5, dashArray: '5 6', fillOpacity: .045}}).addTo(map);
@@ -214,19 +222,55 @@
     drawWalking();
     if (fit) fitResults();
     if (focus) $('adventure-heading').focus({preventScroll: false});
+    if (changed || openWalking) void loadWalking(adventure.id, geometryKey);
   }
   function clearWalking() {
-    state.walking = null; state.walkingVisible = false;
+    state.walking = null; state.walkingVisible = false; state.walkingLoading = false; state.walkingDetail = null;
     if (walkingLayer) walkingLayer.clearLayers();
     $('walking-summary').hidden = true;
     $('walking-route').textContent = 'Show walking route';
   }
+  async function loadWalking(id, key) {
+    state.walkingLoading = true;
+    drawWalking();
+    // Cache both in-flight and completed results; progress updates never refetch.
+    // Failures are cached too, avoiding repeated calls on every saved-card click.
+    if (!walkingCache.has(key)) {
+      const promise = api(`/api/adventures/${id}/walking-route/`, 'POST', {})
+        .catch(error => ({status: 'unavailable', detail: `${error.message} Showing the straight-line exploration sequence.`}));
+      walkingCache.set(key, {id, promise});
+    }
+    const route = await walkingCache.get(key).promise;
+    if (state.geometryKey !== key || !state.adventure) return; // Ignore a late result after switching/deleting.
+    state.walkingLoading = false;
+    state.walking = route.status === 'available' ? route : null;
+    state.walkingVisible = Boolean(state.walking);
+    state.walkingDetail = state.walking ? null : route.detail;
+    drawWalking();
+  }
   function drawWalking() {
+    if (!walkingLayer) return;
     walkingLayer.clearLayers();
     const route = state.walking;
-    $('walking-summary').hidden = !route || !state.walkingVisible;
-    $('walking-route').textContent = state.walkingVisible ? 'Hide walking route' : 'Show walking route';
-    if (!route || !state.walkingVisible) return;
+    const visible = Boolean(route && state.walkingVisible);
+    $('walking-summary').hidden = !visible;
+    $('walking-route').hidden = !route;
+    $('walking-route').disabled = state.busy || state.walkingLoading;
+    $('walking-route').textContent = visible ? 'View straight-line sequence' : 'View walking route';
+    $('walking-spinner').hidden = !state.walkingLoading;
+    $('walking-status').textContent = state.walkingLoading
+      ? 'Calculating walking route… Your stops are ready; you can continue using the adventure.'
+      : state.walkingDetail || (visible ? 'Walking route ready. Solid blue line follows mapped pedestrian ways.' : route ? 'Showing the original straight-line sequence.' : '');
+    if (!state.adventure) return;
+    if (straightLayer) {
+      if (visible) adventureLayer.removeLayer(straightLayer);
+      else if (!adventureLayer.hasLayer(straightLayer)) adventureLayer.addLayer(straightLayer);
+    }
+    $('sequence-notice').textContent = visible ? 'Estimated pedestrian route. Card distances remain straight-line measurements; access and entrances are not verified.' : state.adventure.sequence_notice;
+    $('distance-summary').textContent = visible
+      ? `${metres(route.distance_m)} · ${(route.duration_s / 60).toFixed(1)} min estimated walking`
+      : `${metres(state.adventure.total_distance_m)} of straight-line connections`;
+    if (!visible) return;
     L.geoJSON(route.route, {style: {color: '#2267bd', weight: 5, opacity: .85}}).addTo(walkingLayer);
     $('walking-metrics').textContent = `${metres(route.distance_m)} estimated walking distance · ${(route.duration_s / 60).toFixed(1)} minutes walking`;
     $('walking-notice').textContent = route.notice;
@@ -243,7 +287,7 @@
       const card = node('article', undefined, 'saved-card');
       card.append(node('h3', adventure.title), node('p', `${adventure.progress.visited}/${adventure.progress.total} visited · ${metres(adventure.radius_m)} radius`), button('Open adventure', () => run('Opening saved adventure…', async () => {
         const saved = await api(`/api/adventures/${adventure.id}/`);
-        renderAdventure(saved, true, true); tell('Saved adventure opened.');
+        renderAdventure(saved, true, true, true); tell('Saved adventure opened.');
       }), 'btn btn-outline-dark'));
       list.append(card);
     }
@@ -349,18 +393,9 @@
     $('refresh-saved').addEventListener('click', () => run('Loading saved adventures…', async () => { await refreshSaved(); tell('Saved adventures refreshed.'); }));
     $('more-saved').addEventListener('click', () => run('Loading more adventures…', async () => { await refreshSaved(true); tell('More adventures loaded.'); }));
     $('walking-route').addEventListener('click', () => {
-      if (!state.adventure || state.busy) return;
-      if (state.walking) {
-        state.walkingVisible = !state.walkingVisible; drawWalking();
-        tell(state.walkingVisible ? 'Walking route shown from this page’s saved result.' : 'Walking route hidden. Showing the straight-line sequence.');
-        return;
-      }
-      run('Requesting an optional walking route…', async () => {
-        const route = await api(`/api/adventures/${state.adventure.id}/walking-route/`, 'POST', {});
-        if (route.status !== 'available') { tell(route.detail); return; }
-        state.walking = route; state.walkingVisible = true; drawWalking(); fitResults();
-        tell('Walking route displayed. Times are estimates and exclude visits; check access yourself.');
-      });
+      if (!state.walking || state.busy) return;
+      state.walkingVisible = !state.walkingVisible;
+      drawWalking();
     });
     $('regenerate').addEventListener('click', () => {
       if (!state.adventure) return;
@@ -383,6 +418,7 @@
       if (!window.confirm('Delete this saved adventure? This cannot be undone.')) return;
       run('Deleting adventure…', async () => {
         await api(`/api/adventures/${state.adventure.id}/`, 'DELETE');
+        for (const [key, entry] of walkingCache) { if (entry.id === state.adventure.id) walkingCache.delete(key); }
         state.adventure = null; clearWalking(); state.geometryKey = null; adventureLayer.clearLayers(); stopMarkers.clear(); $('adventure-section').hidden = true; $('welcome').hidden = false;
         tell('Adventure deleted. Your imported places and parks are unchanged.'); await refreshSaved(); $('saved-heading').scrollIntoView({block: 'center'});
       });

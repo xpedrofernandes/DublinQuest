@@ -267,9 +267,15 @@ error text, metadata and credentials are never forwarded. A best-effort per-sess
 30-second cooldown limits repeated requests; it is not a global quota or abuse
 prevention system. All adventure responses retain private/no-store caching.
 
-The browser stores only the current route result in page memory. Show/hide and
-visited updates reuse it. Switching adventure or regenerating clears it. Reloading
-requires an explicit new request; routes are not persisted to PostgreSQL.
+The browser requests a route automatically after rendering a generated or opened
+adventure, without blocking its controls. Pending and completed results are
+cached in page memory by adventure/path/stops. Opening a saved adventure reuses
+its cached result; progress, zoom, pan and view toggles do not request routing.
+Switching adventures clears the visible overlay; regeneration or changed stops
+invalidate that adventure’s cache. Late responses cannot overwrite another
+generation. Failures are cached too; reload or regenerate later to retry.
+Reloading discards the cache and opening a saved adventure starts a new automatic
+request. Routes are not persisted to PostgreSQL. The backend cooldown is unchanged.
 
 The current URL follows the provider's
 [HeiGIT migration](https://ask.openrouteservice.org/t/deprecating-api-openrouteservice-org-in-favour-of-api-heigit-org/7912).

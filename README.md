@@ -15,7 +15,7 @@ Instead of following a fixed tour, you choose where to start, what interests you
 
 The map shows the starting point, search area, numbered stops and a suggested sequence connecting them. Each stop includes a description, category and distance information.
 
-The dashed connecting lines show the suggested exploration order and straight-line distances. An optional **Show walking route** button adds an estimated pedestrian route from openrouteservice/HeiGIT; it leaves the original sequence and stop order unchanged. Walking times exclude visits, and entrances/current access are not verified.
+The dashed connecting lines show the suggested exploration order and straight-line distances. An estimated pedestrian route from openrouteservice/HeiGIT loads automatically when available; it leaves the original sequence and stop order unchanged. A simple control switches between walking and straight-line views. Walking times exclude visits, and entrances/current access are not verified.
 
 ## Web mapping
 
@@ -173,10 +173,15 @@ docker compose up -d --wait web
 ```
 
 The key is used exclusively by Django, never JavaScript. Requests send only the
-ordered waypoint coordinates and routing options to HeiGIT. Select **Show walking
-route** after generating or opening an adventure. The solid blue line and estimated
-walking distance/time are separate from the stored straight-line sequence. Provider
+ordered waypoint coordinates and routing options to HeiGIT. Walking routes load in the background after generating or opening an adventure;
+stops and controls remain usable while a loading indicator is shown. The solid
+blue line becomes the primary view, with estimated walking distance/time. Use
+**View straight-line sequence** to compare the original geometry without another
+request. Provider
 errors, missing configuration or unroutable points fall back without affecting
-saved adventures. Routes are kept only in page memory; visited updates do not
-request them again. See [FRONTEND_TESTING.md](FRONTEND_TESTING.md#optional-walking-route)
+saved adventures. Completed and pending results are reused in page memory, including when
+reopening saved adventures. Progress updates, map controls and view toggles do not
+request routes again. Regeneration or changed stops invalidate the cached result.
+Failures are also reused for the page lifetime; reload or regenerate later to retry.
+No key is required to use the straight-line fallback. See [FRONTEND_TESTING.md](FRONTEND_TESTING.md#optional-walking-route)
 and [API.md](API.md#optional-pedestrian-route).

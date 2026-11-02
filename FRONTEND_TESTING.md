@@ -162,9 +162,12 @@ receives it. Do not print resolved Compose configuration or share `.env`. With t
 key blank, the complete original adventure experience remains available.
 
 1. Generate the five-stop Thomas Moore/College Green example described above.
-2. Select **Show walking route**. It explicitly sends the waypoint coordinates to
-   HeiGIT through Django. Expect a solid blue route and estimated distance/time;
-   the dashed straight-line sequence remains visible for comparison.
+2. The stops and dashed fallback appear immediately, while **Calculating walking
+   route…** and a spinner indicate the background request. Controls remain usable.
+   The form discloses that coordinates are sent to HeiGIT through Django. On
+   success, a solid blue route and estimated distance/time become primary; the
+   dashed connection is hidden. **View straight-line sequence** switches views
+   without another routing request; **View walking route** switches back.
 3. Our live verification returned **1608.1 m / 1157.8 s (19.3 min)** and 99 route
    vertices. Maximum waypoint adjustment was 2.99 m; Georges Quay was 0.53 m.
    Results can change with the provider's data. The blue route followed mapped
@@ -173,15 +176,18 @@ key blank, the complete original adventure experience remains available.
    response warned that road-access-restriction extra information was unavailable.
    Markers stay at source coordinates; adjusted network positions are not verified
    entrances. Times exclude visits; this is not live turn-by-turn navigation.
-5. Mark a stop visited. The blue overlay and metrics should remain. Hide/show the
-   route: neither action nor the visited update should make another walking-route
-   request (check Network for `walking-route`).
-6. Regenerate or switch adventures: the blue overlay disappears. The optional
-   button is available again; requesting a new result within 30 seconds can return
-   a cooldown message. Reopening the same unchanged adventure in the same page can
-   reuse its current result; reloading the page discards it.
+5. Mark a stop visited. The selected route view should remain. Switch views, zoom
+   and pan: none of these actions should make another walking-route request
+   (check Network for `walking-route`). Open the same saved adventure: the cached
+   result should display automatically without another request.
+6. Regenerate or switch adventures: the previous overlay disappears, and routing
+   loads automatically for the new selection. Switching back can reuse a cached
+   result; regeneration invalidates the old one, even when the selected places
+   are the same. A new request within 30 seconds can return the existing backend
+   cooldown message and dashed fallback. Reloading discards page memory. Failed
+   results are cached too; reload or regenerate later to retry.
 7. Without a key, with an unreachable service or with an unroutable waypoint, expect
-   a clear fallback message and a fully usable dashed sequence, cards and progress.
+   an automatic fallback message and a fully usable dashed sequence, cards and progress.
    Automated tests cover these failures with mocks; do not deliberately spend live
    quota repeatedly testing provider failures.
 
@@ -190,3 +196,8 @@ responses, just like OSM tiles. Backend routing tests mock the HTTP transport,
 including invalid geometry, snapping, limits, timeouts, ownership and CSRF. The
 single live verification is separate from regression tests. No routing SDK,
 migration or external infrastructure is required.
+
+Automatic-route regression checks hold a mocked response open to verify non-blocking
+rendering, then test success, missing-key fallback, network errors, cached saved
+loading, regeneration and ignored late responses. These checks consume no live
+routing quota.

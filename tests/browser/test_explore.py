@@ -24,7 +24,23 @@ def main():
         page = context.new_page()
         errors, broken_assets, writes = [], [], []
         routing_calls = []
-        routing_mode = {'available': True}
+        routing_mode = {'available': True, 'hold': True, 'error': False}
+        pending_routes = []
+        result = None
+        def fulfill_route(route):
+            route.fulfill(json={'status':'available','route':result['path'], 'distance_m':1608.1,'duration_s':1157.8,
+                'notice':'Mock pedestrian estimate; excludes visits. Entrances are not verified.',
+                'warnings':[], 'waypoints':[{'displacement_m':1.4}]})
+        def route_reply(route):
+            routing_calls.append(route.request)
+            if routing_mode['hold']:
+                pending_routes.append(route); return
+            if routing_mode['error']:
+                route.abort(); return
+            if not routing_mode['available']:
+                route.fulfill(json={'status':'unavailable','detail':'Walking routing is not configured. Showing the straight-line exploration sequence.'}); return
+            fulfill_route(route)
+        page.route('**/api/adventures/*/walking-route/', route_reply)
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.on('response', lambda response: broken_assets.append(response.url) if '/static/' in response.url and response.status >= 400 else None)
         page.on('request', lambda request: writes.append(request) if '/api/adventures/' in request.url and request.method in ('POST', 'PATCH', 'DELETE') else None)
@@ -68,23 +84,26 @@ def main():
             assert len(result['path']['coordinates']) == 6
             assert len({stop['place']['id'] for stop in result['stops']}) == 5
             assert len({stop['place']['properties']['category'] for stop in result['stops']}) == 4
-            def route_reply(route):
-                routing_calls.append(route.request)
-                if not routing_mode['available']:
-                    route.fulfill(json={'status':'unavailable','detail':'Walking routing is unavailable. Showing the straight-line exploration sequence.'})
-                    return
-                route.fulfill(json={'status':'available','route':result['path'], 'distance_m':1608.1,'duration_s':1157.8,
-                    'notice':'Mock pedestrian estimate; excludes visits. Entrances are not verified.',
-                    'warnings':[], 'waypoints':[{'displacement_m':1.4}]})
-            page.route('**/api/adventures/*/walking-route/', route_reply)
-            click('#walking-route')
+            page.wait_for_selector('#walking-spinner:not([hidden])')
+            assert page.locator('#generate').is_enabled()
+            assert page.locator('#stop-list > li').count() == 5
+            assert page.locator('#map path[stroke="#204a3b"]').count() == 1
+            assert page.locator('#stop-list input').first.is_enabled()
+            routing_mode['hold'] = False
+            fulfill_route(pending_routes.pop())
+            page.wait_for_selector('#walking-summary:not([hidden])')
+            assert page.locator('#map path[stroke="#204a3b"]').count() == 0
             assert page.locator('#walking-summary').is_visible()
             assert '19.3 minutes' in page.locator('#walking-metrics').inner_text()
             assert page.locator('#map path[stroke="#2267bd"]').count() == 1
             click('#walking-route')
             assert page.locator('#walking-summary').is_hidden()
+            assert page.locator('#map path[stroke="#204a3b"]').count() == 1
             click('#walking-route')
             assert len(routing_calls) == 1  # Show/hide reuses the page result.
+            click('.leaflet-control-zoom-in')
+            click('#fit-map')
+            assert len(routing_calls) == 1
             assert page.locator('#stop-list > li').count() == 5
             assert page.locator('.quest-pin:not(.start-pin)').count() == 5
             for stop in result['stops']:
@@ -107,9 +126,10 @@ def main():
             page.reload(); idle()
             click('#saved-list button')
             assert '1 of 5' in page.locator('#progress-label').inner_text()
-            assert page.locator('#walking-summary').is_hidden()
-            click('#walking-route')
+            page.wait_for_selector('#walking-summary:not([hidden])')
             assert len(routing_calls) == 2
+            click('#saved-list button')
+            assert len(routing_calls) == 2  # Cached reopening does not refetch.
             page.locator('#stop-list input').first.uncheck(); idle()
             assert '0 of 5' in page.locator('#progress-label').inner_text()
 
@@ -169,6 +189,7 @@ def main():
             assert context.request.delete(f'{BASE}/api/adventures/{created_id}/').status == 403
 
             # Regenerate with changed settings, preserving UUID and clearing visits.
+            routing_mode['available'] = False
             page.locator('#stop-count').fill('3')
             page.once('dialog', lambda dialog: dialog.accept())
             click('#regenerate')
@@ -176,9 +197,27 @@ def main():
             assert '0 of 3' in page.locator('#progress-label').inner_text()
             assert page.locator('#walking-summary').is_hidden()
             assert page.locator('#map path[stroke="#2267bd"]').count() == 0
-            routing_mode['available'] = False
-            click('#walking-route')
-            assert 'straight-line' in page.locator('#feedback').inner_text()
+            page.wait_for_function("document.querySelector('#walking-status').textContent.includes('not configured')")
+            assert page.locator('#map path[stroke="#204a3b"]').count() == 1
+            assert len(routing_calls) == 3
+            click('#saved-list button')
+            assert len(routing_calls) == 3
+            routing_mode['hold'] = True
+            page.once('dialog', lambda dialog: dialog.accept())
+            click('#regenerate')
+            page.wait_for_selector('#walking-spinner:not([hidden])')
+            assert page.locator('#regenerate').is_enabled()
+            routing_mode['hold'] = False
+            routing_mode['error'] = True
+            page.once('dialog', lambda dialog: dialog.accept())
+            click('#regenerate')
+            page.wait_for_function("document.querySelector('#walking-status').textContent.includes('Unable to reach')")
+            assert page.locator('#map path[stroke="#204a3b"]').count() == 1
+            assert len(routing_calls) == 5
+            fulfill_route(pending_routes.pop())  # A late route from the previous generation must be ignored.
+            page.wait_for_timeout(150)
+            assert page.locator('#walking-summary').is_hidden()
+            assert 'Unable to reach' in page.locator('#walking-status').inner_text()
             assert page.locator('#stop-list > li').count() == 3
             page.once('dialog', lambda dialog: dialog.accept('Renamed browser adventure'))
             click('#rename')

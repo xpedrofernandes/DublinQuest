@@ -45,7 +45,7 @@
         </fieldset>
         <div class="row g-3 mb-3"><div class="col-6"><label for="radius" class="form-label">Search radius</label><select id="radius" class="form-select"><option value="500">500 m</option><option value="1000">1 km</option><option value="2000" selected>2 km</option><option value="3000">3 km</option><option value="5000">5 km</option></select></div><div class="col-6"><label for="stop-count" class="form-label">Number of stops</label><input id="stop-count" class="form-control" type="number" min="1" max="10" value="5" required></div></div>
         <button id="generate" class="btn btn-quest w-100" type="submit" disabled>Generate adventure <span aria-hidden="true">↗</span></button>
-        <p class="hint mt-2">Automatically saved in this browser. No account needed.</p>
+        <p class="hint mt-2">Automatically saved in this browser. No account needed. When available, walking routes are calculated by openrouteservice/HeiGIT using your start and stop coordinates.</p>
       </form>
       <details class="spatial-tools" open><summary>Explore the spatial data</summary><p class="hint">Use the selected start, radius and categories to discover what is nearby.</p>
         <div class="d-grid gap-2"><button id="nearby" type="button" class="btn btn-outline-dark" disabled>Find nearby places</button><button id="intersections" type="button" class="btn btn-outline-dark" disabled>Find parks overlapping radius</button></div>
@@ -58,7 +58,7 @@
       <section id="adventure-section" class="panel adventure-panel" aria-labelledby="adventure-heading" hidden>
         <div class="section-top"><div><p class="eyebrow">02 / FOLLOW YOUR CURIOSITY</p><h2 id="adventure-heading" tabindex="-1"></h2></div><span id="distance-summary" class="distance-summary"></span></div>
         <p id="sequence-notice" class="notice"></p><div id="adventure-warnings" class="notice warning" hidden></div>
-        <div class="walking-controls"><button id="walking-route" type="button" class="btn btn-quest">Show walking route</button><p class="hint">Optional: sends the adventure's waypoint coordinates to openrouteservice/HeiGIT. Dashed lines remain the straight-line sequence.</p></div>
+        <div class="walking-controls"><p class="hint">Walking routes load automatically and send the adventure's waypoint coordinates to openrouteservice/HeiGIT. Without routing, the dashed straight-line sequence remains available.</p><div role="status" aria-live="polite"><span id="walking-spinner" class="spinner-border spinner-border-sm me-2" aria-hidden="true" hidden></span><span id="walking-status"></span></div><button id="walking-route" type="button" class="btn btn-outline-dark my-2" hidden>View straight-line sequence</button></div>
         <div id="walking-summary" class="notice" aria-live="polite" hidden><strong id="walking-metrics"></strong><p id="walking-notice" class="mb-1"></p><p id="walking-snapping" class="mb-1"></p><p id="walking-warning" class="mb-1"></p><a href="https://openrouteservice.org/" target="_blank" rel="noopener noreferrer">Routing © openrouteservice / HeiGIT</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a></div>
         <div class="progress-heading"><label for="adventure-progress">Your progress</label><span id="progress-label"></span></div><progress id="adventure-progress" max="100" value="0"></progress><p id="completion" class="completion" hidden>Adventure complete. A little more of Dublin, discovered.</p>
         <ol id="stop-list" class="stop-list"></ol>
