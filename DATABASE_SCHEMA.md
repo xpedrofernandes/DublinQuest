@@ -1,6 +1,50 @@
 # Database schema
 
-The initial schema is implemented in `places/models.py` and `adventures/models.py`, with committed initial migrations. Spatial data is stored in PostGIS, not SQLite. The four dataset-specific management commands populate this schema from the bundled snapshots; see README and DATA_SOURCES.md for commands and audit counts.
+The schema is implemented in `places/models.py` and `adventures/models.py`, with committed migrations. Spatial data is stored in PostGIS, not SQLite. The four dataset-specific management commands populate this schema from the bundled snapshots; see README and DATA_SOURCES.md for commands and audit counts.
+
+```mermaid
+erDiagram
+    DatasetSource o|--o{ Place : identifies
+    DatasetSource o|--o{ Park : identifies
+    Park o|--o| Place : representative
+    Adventure ||--|{ AdventureStop : orders
+    Place ||--o{ AdventureStop : references
+    DatasetSource {
+        bigint id PK
+        string slug UK
+        string sha256
+        string resource_url
+        string licence_url
+    }
+    Place {
+        bigint id PK
+        bigint source_id FK
+        bigint park_id FK
+        string category
+        Point point_2157
+    }
+    Park {
+        bigint id PK
+        bigint source_id FK
+        MultiPolygon boundary_2157
+    }
+    Adventure {
+        UUID id PK
+        UUID owner_uuid
+        Point start_2157
+        Polygon search_area_2157
+        LineString path_2157
+    }
+    AdventureStop {
+        bigint id PK
+        UUID adventure_id FK
+        bigint place_id FK
+        integer position
+        datetime visited_at
+    }
+```
+
+The diagram shows successful generated adventures; the schema also allows an ungenerated Adventure with no stops and nullable path/search area. Session ownership is an application-level link through the UUID in Django's `django_session` data, not a foreign key to `auth_user`.
 
 ## Spatial entities and provenance
 
@@ -18,15 +62,15 @@ A park's optional representative Place must have category `park`; other categori
 
 `source_key` is the importer's stable identifier within a dataset; source titles, artwork names and coordinates are not globally unique. The park importer uses the qualified `PRIMARYINDEX`. The point-source commands use one-based `row:<number>` keys within their checksum-pinned snapshot, rather than treating duplicated artwork profile links as unique keys. Changing snapshots requires a reviewed identifier/reconciliation decision.
 
-The guest owner UUID is a server-assigned session identifier, not a user-supplied ownership claim. It is not generated automatically on every Adventure: a future request handler must provide the session's owner identifier. Guest endpoints filter every lookup by the owner UUID in the server-side database session; see API.md. That UUID is not accepted from API input or exposed in responses.
+The guest owner UUID is a server-assigned session identifier, not a user-supplied ownership claim. The guest request handler supplies the session's owner identifier. Guest endpoints filter every lookup by the owner UUID in the server-side database session; see API.md. That UUID is not accepted from API input or exposed in responses.
 
 ## Coordinates and generated geometry
 
-Source GeoJSON declares CRS84 (WGS84 longitude/latitude). Load GEOS points as `(longitude, latitude)`, assign the source SRID, then call `transform(2157)` before validation/save. Browser GeoJSON will be transformed back to EPSG:4326 later. The public-art CSV datum remains an explicitly documented qualification uncertainty; the CSV command requires an explicit `--source-srid 4326` declaration and records the remaining datum uncertainty.
+Source GeoJSON declares CRS84 (WGS84 longitude/latitude). Load GEOS points as `(longitude, latitude)`, assign the source SRID, then call `transform(2157)` before validation/save. Browser GeoJSON is transformed back to EPSG:4326 by the serializers. The public-art CSV datum remains an explicitly documented qualification uncertainty; the CSV command requires an explicit `--source-srid 4326` declaration and records the remaining datum uncertainty.
 
-Geometry validators reject empty/invalid geometry and require EPSG:2157. Django `save()` does not automatically call `full_clean()`: importers and future mutation paths must explicitly validate. PostgreSQL geometry typmods enforce stored type/SRID, while uniqueness and scalar checks provide separate database safeguards. Model validation is not a claim that raw SQL automatically enforces GEOS validity.
+Geometry validators reject empty/invalid geometry and require EPSG:2157. Django `save()` does not automatically call `full_clean()`: importers and mutation paths explicitly validate. PostgreSQL geometry typmods enforce stored type/SRID, while uniqueness and scalar checks provide separate database safeguards. Model validation is not a claim that raw SQL automatically enforces GEOS validity.
 
-Adventure search area and path remain nullable at schema level for ungenerated records, but successful guest API creation always fills both. The generation function builds a valid EPSG:2157 LineString from the start and ordered stops and a PostGIS search buffer. Regeneration replaces geometry and stops atomically while preserving the adventure UUID/owner; visited progress resets after confirmation. Renaming does not regenerate. Stop order/distances describe generation time; regenerate if staff later move related source places. These lines are straight connections, not pedestrian routes. The park importer explicitly synchronizes each representative point to the transformed boundary's point-on-surface; no synchronization is hidden inside model `save()`. Future staff park updates must use the same explicit synchronization rule.
+Adventure search area and path remain nullable at schema level for ungenerated records, but successful guest API creation always fills both. The generation function builds a valid EPSG:2157 LineString from the start and ordered stops and a PostGIS search buffer. Regeneration replaces geometry and stops atomically while preserving the adventure UUID/owner; visited progress resets after confirmation. Renaming does not regenerate. Stop order/distances describe generation time; regenerate if staff later move related source places. These lines are straight connections, not pedestrian routes. The park importer explicitly synchronizes each representative point to the transformed boundary's point-on-surface; no synchronization is hidden inside model `save()`. The staff parks API uses the same explicit synchronization rule.
 
 ## Migrations and tests
 

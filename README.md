@@ -13,7 +13,9 @@ Instead of following a fixed tour, you choose where to start, what interests you
 3. Explore the suggested stops using the map and an ordered list of places.
 4. Follow your quest journey, mark stops as visited and keep track of your progress.
 
-The next discovery is the first stop you have not marked visited. Journey cards
+Visited markers show an emerald checkmark; the next marker has an orange ring and arrow. Marker popups also let you mark or undo a visit. Incoming walking-route legs have distinct colours and turn grey when their destination is marked visited, without another routing request. Expand **Leg colours** in the journey for numbered labels. Shared mapped sections can overlap visually.
+
+The next discovery is the first stop you have not marked visited. Journey cards and numbered map markers
 distinguish Next stop, Upcoming and Visited; completing the checklist reveals a
 Quest complete panel. Progress is self-reported, not verified by GPS.
 
@@ -35,7 +37,7 @@ The project uses real Dublin open data stored in PostgreSQL/PostGIS. Its spatial
 - Finding attractions inside a park's boundary.
 - Finding parks and open spaces that overlap the search area.
 - Storing places as points, park boundaries as polygons and adventure sequences as lines.
-- Creating, viewing, editing and deleting spatial records through a staff management interface.
+- Creating, viewing, editing and deleting spatial records through the authenticated DRF browsable API.
 
 Adventures and visited stops are saved for the same browser, without requiring a visitor account.
 
@@ -90,7 +92,7 @@ In pgAdmin, register a server with host `db`, port `5432`, maintenance database 
 - `templates/explore.html`: accessible adventure-builder page.
 - `static/`: original CSS/JavaScript and licensed Leaflet/Bootstrap assets; collected output stays inside the web container.
 
-The initial spatial schema is implemented in `places` and `adventures`; see [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) for fields, relationships, CRS handling and database-backed test commands. Migrations are applied explicitly during setup. Dataset import commands are available below; the places/parks endpoints and spatial searches are documented in [API.md](API.md). The frontend uses these same APIs; it does not repeat spatial queries or stop selection in JavaScript.
+The spatial schema is implemented in `places` and `adventures`; see [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) for fields, relationships, CRS handling and database-backed test commands. Migrations are applied explicitly during setup. Dataset import commands are available below; the places/parks endpoints and spatial searches are documented in [API.md](API.md). The frontend uses these same APIs; it does not repeat spatial queries or stop selection in JavaScript.
 
 ## Containers and persistence
 
@@ -166,7 +168,7 @@ Public GeoJSON endpoints provide place/park listings, category filters, proximit
 
 ## Your first adventure
 
-Guest sessions can now generate/save adventures, retrieve them, mark stops visited, regenerate their straight-line sequence and delete them. No visitor account is needed. The algorithm selects real nearby places with category variety and a deterministic nearest-next order; it does not calculate walking routes. Open http://localhost:8000/, search for **Thomas Moore**, choose the result near College Green, leave the four categories selected, and generate five stops within 2 km. Adventures save automatically. Use the visited checkboxes and the saved-adventure cards to continue later. Regeneration applies the current builder settings and resets progress after confirmation. The map lines are straight connections, not pedestrian routes.
+Guest sessions can now generate/save adventures, retrieve them, mark stops visited, regenerate their straight-line sequence and delete them. No visitor account is needed. The algorithm selects real nearby places with category variety and a deterministic nearest-next order; it does not calculate walking routes. Open http://localhost:8000/, search for **Thomas Moore**, choose the result near College Green, leave the four categories selected, and generate five stops within 2 km. Adventures save automatically. Use the visited checkboxes and the saved-adventure cards to continue later. Regeneration applies the current builder settings and resets progress after confirmation. The dashed sequence is a straight connection; the optional solid pedestrian overlay is requested separately in the background.
 
 The interface uses local Leaflet 1.9.4 and Bootstrap 5.3.8 assets; no frontend build system is required. OpenStreetMap tiles need internet access. Django sends `Referrer-Policy: strict-origin-when-cross-origin` so tile requests identify the application origin without exposing page paths or query strings; normal browser tile caching is preserved. Scroll-wheel map zoom is disabled to make page scrolling easier; use the map zoom controls, keyboard or touch gestures. A place search provides an alternative to choosing a start by clicking the map.
 
@@ -200,3 +202,33 @@ Starting-place autocomplete searches the imported database only; it is not an
 address geocoder. Three separately labelled popular starting points use published
 reference coordinates and are not verified entrances or extra destinations. Their
 sources are recorded in [DATA_SOURCES.md](DATA_SOURCES.md#popular-starting-point-shortcuts-ui-constants-only).
+
+## Project documentation and assessment
+
+- [Architecture and request flow](ARCHITECTURE.md)
+- [Database schema and spatial indexes](DATABASE_SCHEMA.md)
+- [API endpoints and spatial-query demonstrations](API.md)
+- [User guide and browser checks](FRONTEND_TESTING.md)
+- [Data sources, licences and import decisions](DATA_SOURCES.md)
+- [Final verification and rubric evidence](FINAL_AUDIT.md)
+- [Submission checklist and five-minute demonstration](SUBMISSION.md)
+
+### Current application screenshots
+
+These captures show the real application, real OpenStreetMap tiles and the no-key
+straight-line fallback on a clean local installation. Two stops are marked visited;
+no routing geometry or background tiles are mocked in these screenshots.
+
+![Desktop quest journey alongside the interactive Dublin map](screenshots/desktop.png)
+![Tablet view with independently scrollable journey](screenshots/tablet.png)
+![Mobile map and compact next-discovery controls](screenshots/mobile.png)
+
+### Limitations
+
+- Imported data is historical. Invalid/ambiguous records are quarantined, not silently repaired. The public-art CSV datum is an explicit WGS84 interpretation; dataset licence metadata does not identify a specific CC BY version.
+- Popular starting points are approximate references, not verified entrances. Search covers imported names, not arbitrary addresses.
+- Guest access depends on the browser session cookie (Django's default expiry is two weeks); clearing or losing it removes access to those quests. The database records are not transferred between browsers.
+- Radius measures distance from the start, not total walking distance. Stop order is deterministic and greedy, not an optimal pedestrian tour.
+- ORS needs an optional private key and internet access. Results/failures are cached only in page memory; provider requests have a 30-second session cooldown. Reloading can issue another request. Routes and visit claims do not verify access, entrances or physical presence.
+- OSM imagery and Swagger UI assets need internet access. The normal interface assets and datasets are bundled. No offline tile download is provided.
+- This Docker setup is verified for local loopback HTTP. Public cloud hosting and HTTPS are not deployed; see the deployment notes in [SUBMISSION.md](SUBMISSION.md).
