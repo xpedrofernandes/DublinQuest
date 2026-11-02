@@ -1,0 +1,61 @@
+# Local coursework materials and internal references (keep on disk).
+/assignment/
+/course-materials/
+/docs/
+/microsoft/
+/Microsoft/
+
+# Local secrets; retain the public configuration template.
+.env
+.env.*
+!.env.example
+.secrets/
+secrets/
+*.pem
+*.key
+
+# Python environments, bytecode and test/tool caches.
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Database files, local volume directories and backups.
+*.sqlite3
+*.sqlite3-journal
+/volumes/
+/docker-volumes/
+/postgres_data/
+/postgis_data/
+/pgadmin_data/
+/backups/
+*.dump
+
+# Collected/generated assets and temporary output.
+/staticfiles/
+/media/
+/build/
+/dist/
+/tmp/
+/temp/
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# Machine/editor state.
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
