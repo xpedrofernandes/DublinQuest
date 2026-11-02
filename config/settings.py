@@ -78,6 +78,9 @@ SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
 X_FRAME_OPTIONS = "DENY"
 SECURE_CONTENT_TYPE_NOSNIFF = True
+# OSM tiles need a Referer. Cross-origin requests share only our origin, not
+# page paths/query strings; HTTPS-to-HTTP requests still send no referrer.
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 # Local demonstration uses HTTP. Enable these only behind correctly configured HTTPS.
 SESSION_COOKIE_SECURE = os.environ.get("HTTPS_ENABLED", "False").lower() == "true"
 CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE

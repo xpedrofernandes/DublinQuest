@@ -5,6 +5,7 @@ Uses an isolated guest browser context and removes only adventures it creates.
 Run with: python tests/browser/test_explore.py
 """
 import os
+import base64
 
 from playwright.sync_api import sync_playwright
 
@@ -16,6 +17,10 @@ def main():
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(executable_path=CHROME, headless=True)
         context = browser.new_context(viewport={'width': 1440, 'height': 1050})
+        # Exercise map interactions without automated pan/zoom traffic to OSM.
+        # Actual map imagery and request headers need the separate manual check.
+        tile = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aV1kAAAAASUVORK5CYII=')
+        context.route('https://tile.openstreetmap.org/**', lambda route: route.fulfill(status=200, content_type='image/png', body=tile))
         page = context.new_page()
         errors, broken_assets, writes = [], [], []
         page.on('pageerror', lambda error: errors.append(str(error)))
@@ -36,12 +41,13 @@ def main():
             click('#search-results button >> nth=0')
             assert 'Thomas Moore' in page.locator('#start-label').inner_text()
 
-        page.goto(BASE)
+        response = page.goto(BASE)
+        assert response.headers['referrer-policy'] == 'strict-origin-when-cross-origin'
         idle()
         assert page.title() == 'DublinQuest — Explore Dublin Your Way'
         assert page.locator('#generate').is_disabled()
         assert page.locator('.leaflet-control-attribution').is_visible()
-        assert page.locator('.leaflet-tile-loaded').count() > 0, 'OSM tiles did not load'
+        page.wait_for_selector('.leaflet-tile-loaded')  # Mock tiles, not evidence of real OSM imagery.
         created_id = None
         try:
             # Map click, then searchable imported start (no geocoder).

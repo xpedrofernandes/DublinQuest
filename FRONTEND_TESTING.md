@@ -122,9 +122,34 @@ python3 -m venv /tmp/dq-browser-env
 ```
 
 Override `DQ_CHROME` for another Chrome executable location, or `DQ_TEST_URL` for
-another local port. The test requires the unchanged imported data and working OSM
-tile access. It generates temporary adventures and deletes only those it created,
+another local port. The test requires the unchanged imported data. It intercepts tile requests with
+a tiny test image, so automated pan/zoom never fetches real OSM tiles. A loaded
+image or HTTP 200 alone does not establish that the real basemap is working. It generates temporary adventures and deletes only those it created,
 including on failure. Screenshots go to `/tmp/dublinquest-{desktop,tablet,mobile}.png`,
 not the repository. It checks the user journey, all three spatial controls,
 responsive overflow, errors, guest isolation and CSRF; it is not a comprehensive
 cross-browser, screen-reader or performance test.
+
+## Verify real OpenStreetMap tiles
+
+Open the application normally in Chrome and confirm visible Dublin streets,
+river and labels, not yellow/black Access blocked images. In Developer Tools:
+
+1. Select Network, leave **Disable cache unchecked**, then filter for `tile.openstreetmap.org`.
+2. Open a tile request. Its HTTPS URL must use
+   `https://tile.openstreetmap.org/{z}/{x}/{y}.png`.
+3. Request headers should include `Referer: http://localhost:8000/` when using the
+   documented local address. The document response header must be
+   `Referrer-Policy: strict-origin-when-cross-origin`. Cross-origin referrers
+   disclose only the origin, not page paths or query strings.
+4. Inspect the tile Preview: a successful status can still contain a block image.
+   Verify actual map imagery and visible OpenStreetMap attribution. Normal browser
+   caching is left intact; the API helper's `cache: no-store` applies only to API
+   requests, not Leaflet's image requests.
+
+The original Django default `same-origin` suppressed the tile referrer. A
+regression assertion checks the new response header; browser interaction tests
+use mock tiles and do not claim to verify live imagery. Do not add cache-busting
+parameters, spoof headers, proxy requests to evade restrictions, prefetch tiles,
+or run automated real-tile pan/zoom scans. See the official
+[OSMF Tile Usage Policy](https://operations.osmfoundation.org/policies/tiles/).

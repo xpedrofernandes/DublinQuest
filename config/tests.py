@@ -40,6 +40,7 @@ class ExplorePageTests(SimpleTestCase):
     def test_page_has_accessible_builder_map_and_local_assets(self):
         response = self.client.get(reverse("explore"))
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["Referrer-Policy"], "strict-origin-when-cross-origin")
         self.assertTemplateUsed(response, "explore.html")
         for text in ['lang="en"', 'id="map"', 'id="adventure-form"',
                      'id="saved-section"', 'id="nearby"', 'id="intersections"',
