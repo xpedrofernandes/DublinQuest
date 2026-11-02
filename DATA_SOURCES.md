@@ -153,3 +153,27 @@ Point-source keys are `row:<one-based row>` and are valid within the exact check
 The CSV importer requires `--source-srid 4326` to make its interpretation visible; its JSON warning explicitly says that this is not publisher confirmation. GeoJSON CRS84 is checked before loading. Geometry copies use longitude/latitude order and transform to EPSG:2157; raw sources and SHA-256 values are unchanged.
 
 Database-backed tests load all four bundled datasets into a separate PostGIS test database twice, checking expected outcomes, stable primary keys, representative-point synchronization, geometry validity/SRIDs, SQL containment and a PostGIS transformation of a known source point. Tests also reject changed checksums/missing CSV SRID declaration and verify atomic rollback after an unexpected write failure. See DATABASE_SCHEMA.md for the restricted-role test setup.
+
+## Popular starting-point shortcuts (UI constants only)
+
+Three separately labelled reference coordinates let visitors start somewhere
+recognizable without requiring a matching imported Place. They are equivalent to
+choosing a map coordinate: they are not imported, added to the destination pool or
+used to repair quarantined records (including the original Trinity record).
+No geocoding service or extra dataset download is used at runtime.
+
+Coordinates were checked against the published Wikidata P625 statements on
+2 November 2026 and converted from degrees/minutes/seconds into WGS84 decimal
+degrees. These are approximate college/park/neighbourhood reference locations,
+not independently surveyed points or verified entrances/access locations.
+
+| Shortcut | Published latitude/longitude | Reference |
+|---|---|---|
+| Trinity College Dublin | 53°20′40″ N, 6°15′28″ W | [Q258464](https://www.wikidata.org/wiki/Q258464) |
+| St Stephen’s Green | 53°20′17″ N, 6°15′33″ W | [Q1432605](https://www.wikidata.org/wiki/Q1432605) |
+| Temple Bar neighbourhood | 53°20′44.115″ N, 6°15′46″ W | [Q920229](https://www.wikidata.org/wiki/Q920229) |
+
+The constants and source item IDs are in `static/js/explore.js`; the UI links to
+each source. Wikidata structured data is available under CC0, as stated in those
+pages' footers. Source photographs and other page content are not bundled.
+The four original dataset snapshots, licences and import decisions are unchanged.

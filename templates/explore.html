@@ -22,17 +22,19 @@
 <main class="container-fluid page-shell">
   <section class="intro" aria-labelledby="page-title"><div><p class="eyebrow">DUBLIN / A CITY WORTH DISCOVERING</p><h1 id="page-title">Dublin is your next adventure.</h1><p>Follow your curiosity through art, history and green spaces. Build a quest that feels like yours.</p></div><span class="city-tag">MADE FOR EXPLORING <span aria-hidden="true">↗</span></span></section>
   <div id="feedback" class="feedback" role="status" aria-live="polite" aria-atomic="true" tabindex="-1">Choose a starting point to begin.</div>
-  <nav class="quest-nav" aria-label="Exploration shortcuts"><a href="#map-panel">Map</a><a id="journey-link" href="#adventure-section" hidden>Journey</a><a href="#builder">Edit quest</a></nav>
+  <nav class="quest-nav" aria-label="Exploration shortcuts"><a href="#map-panel">Map</a><a id="journey-link" href="#adventure-section" hidden>Journey</a><a href="#builder" data-edit-quest>Edit quest</a></nav>
   <noscript><p class="alert alert-warning">JavaScript is needed for the map and adventure controls.</p></noscript>
   <div class="explore-layout">
-    <aside class="builder-panel panel" id="builder" aria-labelledby="builder-title">
-      <p class="eyebrow">YOUR CITY. YOUR QUEST.</p><h2 id="builder-title">Make it your own</h2><p class="builder-step"><span aria-hidden="true">01</span> Choose your start</p>
+    <aside class="builder-panel panel" id="builder" tabindex="-1" aria-labelledby="builder-title">
+      <button id="return-quest" type="button" class="btn btn-outline-dark mb-3" hidden>Return to saved quest</button><p id="edit-explanation" class="hint" hidden>Changes apply when you regenerate or build a new quest. Return discards unapplied edits.</p><p class="eyebrow">YOUR CITY. YOUR QUEST.</p><h2 id="builder-title">Make it your own</h2><p class="builder-step"><span aria-hidden="true">01</span> Choose your start</p>
       <form id="place-search-form" role="search">
         <label for="place-search" class="form-label">Find a starting place</label>
-        <div class="input-group"><input id="place-search" class="form-control" type="search" maxlength="100" placeholder="Try Thomas Moore or Merrion" required><button class="btn btn-outline-dark" type="submit">Search</button></div>
-        <p class="hint">Search our imported places, or click anywhere on the map.</p>
+        <div class="input-group"><input id="place-search" class="form-control" type="search" maxlength="100" placeholder="Type a place name…" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="search-results" aria-describedby="search-help search-status" required><button class="btn btn-outline-dark" type="submit">Search</button></div>
+        <p id="search-help" class="hint">Suggestions search imported DublinQuest destinations. Use a popular starting point below, or click anywhere on the map.</p>
       </form>
-      <div id="search-results" class="search-results" aria-live="polite"></div>
+      <p id="search-status" class="hint" role="status" aria-live="polite"></p>
+      <div id="search-results" class="search-results" role="listbox" aria-label="Imported location suggestions"></div>
+      <div class="popular-starts"><p class="form-label">Popular starting points</p><div id="popular-starts" class="d-grid gap-2"></div><p class="hint">Reference locations, separate from quest destinations; not verified entrances. <a href="https://www.wikidata.org/wiki/Q258464" target="_blank" rel="noopener noreferrer">Trinity</a> · <a href="https://www.wikidata.org/wiki/Q1432605" target="_blank" rel="noopener noreferrer">St Stephen’s Green</a> · <a href="https://www.wikidata.org/wiki/Q920229" target="_blank" rel="noopener noreferrer">Temple Bar</a> (Wikidata, CC0).</p></div>
       <form id="adventure-form">
         <div class="start-summary"><span class="mini-label">STARTING POINT</span><output id="start-label">No location selected</output><button id="clear-start" type="button" class="text-button" hidden>Clear</button></div>
         <p class="builder-step"><span aria-hidden="true">02</span> Pick your discoveries</p>
@@ -48,7 +50,7 @@
         <p class="builder-step"><span aria-hidden="true">03</span> Build your quest</p>
         <div class="mb-3"><label for="adventure-title" class="form-label">Quest name <span class="optional">(optional)</span></label><input id="adventure-title" class="form-control" maxlength="120" placeholder="My Dublin discovery"></div>
         <button id="generate" class="btn btn-quest w-100" type="submit" disabled>Build my quest <span aria-hidden="true">↗</span></button>
-        <p class="hint mt-2">Automatically saved in this browser. No account needed. When available, walking routes are calculated by openrouteservice/HeiGIT using your start and stop coordinates.</p>
+        <button id="apply-regenerate" type="button" class="btn btn-outline-dark w-100 mt-2" hidden>Regenerate this quest with edits</button><p class="hint mt-2">Automatically saved in this browser. No account needed. When available, walking routes are calculated by openrouteservice/HeiGIT using your start and stop coordinates.</p>
       </form>
       <details class="spatial-tools" open><summary>Explore the spatial data</summary><p class="hint">Use the selected start, radius and categories to discover what is nearby.</p>
         <div class="d-grid gap-2"><button id="nearby" type="button" class="btn btn-outline-dark" disabled>Find nearby places</button><button id="intersections" type="button" class="btn btn-outline-dark" disabled>Find parks overlapping radius</button></div>
@@ -56,26 +58,28 @@
         <div id="park-results" class="search-results"></div>
       </details>
     </aside>
-    <section class="map-and-results" aria-label="Map and adventure results">
-      <div class="map-frame panel" id="map-panel"><div class="map-heading"><span><span class="live-dot" aria-hidden="true"></span> Your Dublin canvas</span><button id="fit-map" type="button" class="text-button">Fit results</button></div><div id="map" aria-label="Interactive Dublin map. Click to choose your starting point. Use place search as a keyboard alternative."></div><div class="map-caption"><span><b>S</b> Start</span><span><b>1</b> Adventure stop</span><span class="map-note">Click the map to choose a start</span></div></div>
-      <section id="adventure-section" class="panel adventure-panel" aria-labelledby="adventure-heading" hidden>
+      <section id="adventure-section" class="panel adventure-panel" tabindex="-1" aria-labelledby="adventure-heading" hidden>
+        <div class="journey-toolbar"><button id="edit-quest" type="button" class="btn btn-outline-dark">Edit quest</button><button id="quest-data" type="button" class="text-button">Spatial tools</button></div>
         <div class="quest-header">
           <div class="quest-heading-row"><div><p class="eyebrow">YOUR DUBLIN QUEST</p><h2 id="adventure-heading" tabindex="-1"></h2></div><span class="quest-seal" aria-hidden="true">↗</span></div>
           <div class="quest-facts"><span id="quest-stop-count"></span><span id="route-type">Straight-line sequence</span><span id="distance-summary"></span></div>
           <div class="progress-heading"><label for="adventure-progress">Your journey so far</label><span id="progress-label" role="status" aria-live="polite" aria-atomic="true"></span></div><progress id="adventure-progress" max="100" value="0"></progress>
           <p class="progress-disclaimer">Your checklist, your pace. Visits are marked by you, not verified by GPS.</p>
         </div>
-        <section id="next-discovery" class="next-discovery" aria-labelledby="next-label" hidden><div><p id="next-label" class="eyebrow">NEXT DISCOVERY</p><h3 id="next-name"></h3><p id="next-description" class="hint"></p></div><button id="next-map" type="button" class="btn btn-quest">Show on map <span aria-hidden="true">↗</span></button></section>
-        <section id="completion" class="completion" aria-labelledby="completion-title" hidden><span class="completion-mark" aria-hidden="true">✓</span><div><p class="eyebrow">A LITTLE MORE DUBLIN, DISCOVERED</p><h3 id="completion-title">Quest complete</h3><p id="completion-detail"></p><p class="hint">Completed from your own checklist. Ready for another perspective?</p><a href="#builder" class="btn btn-outline-dark">Create another quest</a></div></section>
+        <div id="journey-next-slot"></div><section id="next-discovery" class="next-discovery" aria-labelledby="next-label" hidden><div><p id="next-label" class="eyebrow">NEXT DISCOVERY</p><h3 id="next-name"></h3><p id="next-description" class="hint"></p></div><div class="next-actions"><button id="quick-visit" type="button" class="btn btn-quest">Mark next stop visited</button><button id="quick-undo" type="button" class="text-button" hidden>Undo last mark</button><button id="open-journey" type="button" class="text-button">Full journey</button><button id="next-map" type="button" class="btn btn-quest">Show on map <span aria-hidden="true">↗</span></button></div></section>
+        <section id="completion" class="completion" aria-labelledby="completion-title" hidden><span class="completion-mark" aria-hidden="true">✓</span><div><p class="eyebrow">A LITTLE MORE DUBLIN, DISCOVERED</p><h3 id="completion-title">Quest complete</h3><p id="completion-detail"></p><p class="hint">Completed from your own checklist. Ready for another perspective?</p><a href="#builder" data-edit-quest class="btn btn-outline-dark">Create another quest</a></div></section>
+        <details id="journey-details" open><summary>Complete journey &amp; quest management</summary>
+        <div class="journey-heading"><h3>Your quest journey</h3><span>One discovery at a time</span></div>
+        <ol id="stop-list" class="stop-list"></ol>
+        <div class="adventure-actions"><button id="regenerate" type="button" class="btn btn-outline-dark">Regenerate with form settings</button><button id="rename" type="button" class="text-button">Rename</button><button id="delete-adventure" type="button" class="text-button danger">Delete adventure</button></div></details>
         <div class="route-information">
           <p id="sequence-notice" class="notice"></p><div id="adventure-warnings" class="notice warning" hidden></div>
           <div class="walking-controls"><div role="status" aria-live="polite"><span id="walking-spinner" class="spinner-border spinner-border-sm me-2" aria-hidden="true" hidden></span><span id="walking-status"></span></div><button id="walking-route" type="button" class="btn btn-outline-dark my-2" hidden>View straight-line sequence</button></div>
           <div id="walking-summary" class="notice" hidden><strong id="walking-metrics"></strong><p class="mb-1">Walking time excludes visits. Check access and opening hours; park points are not verified entrances.</p><p id="walking-warning" class="mb-1 warning-text" role="status"></p><p class="routing-attribution"><a href="https://openrouteservice.org/" target="_blank" rel="noopener noreferrer">Routing © openrouteservice / HeiGIT</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a></p><details><summary>Route details &amp; waypoint adjustments</summary><p id="walking-notice" class="mb-1"></p><p id="walking-snapping" class="mb-1"></p></details></div>
         </div>
-        <div class="journey-heading"><h3>Your quest journey</h3><span>One discovery at a time</span></div>
-        <ol id="stop-list" class="stop-list"></ol>
-        <div class="adventure-actions"><button id="regenerate" type="button" class="btn btn-outline-dark">Regenerate with form settings</button><button id="rename" type="button" class="text-button">Rename</button><button id="delete-adventure" type="button" class="text-button danger">Delete adventure</button></div>
       </section>
+    <section class="map-and-results" aria-label="Map and adventure results">
+      <div class="map-frame panel" id="map-panel"><div class="map-heading"><span><span class="live-dot" aria-hidden="true"></span> Your Dublin canvas</span><div class="map-controls"><button id="map-edit" type="button" class="text-button" hidden>Edit quest</button><button id="fit-map" type="button" class="text-button">Fit results</button></div></div><div id="map" aria-label="Interactive Dublin map. Click to choose your starting point. Use place search as a keyboard alternative."></div><div class="map-caption"><span><b>S</b> Start</span><span><b>1</b> Adventure stop</span><span class="map-note">Click the map to choose a start</span></div><div id="map-route-summary" class="map-route-summary" hidden><strong id="map-route-metrics"></strong><p id="map-route-status"></p><p id="map-route-warning" class="warning-text" role="status"></p><p class="routing-attribution"><a href="https://openrouteservice.org/" target="_blank" rel="noopener noreferrer">openrouteservice / HeiGIT</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OSM contributors</a></p><button id="map-route-toggle" type="button" class="text-button" hidden>Switch route view</button></div></div><div id="mobile-next-slot"></div>
       <section id="spatial-section" class="panel adventure-panel" aria-labelledby="spatial-heading" hidden><div class="section-top"><h2 id="spatial-heading" tabindex="-1">Spatial results</h2><button id="clear-spatial" type="button" class="text-button">Clear layer</button></div><p id="spatial-summary" class="hint"></p><div id="spatial-list" class="spatial-list"></div></section>
       <section class="empty-panel" id="welcome"><span class="empty-symbol" aria-hidden="true">↗</span><div><h2>A few stops. A fresh perspective.</h2><p>Pick a start, choose your interests and see where Dublin takes you.</p></div></section>
     </section>

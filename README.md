@@ -8,7 +8,7 @@ Instead of following a fixed tour, you choose where to start, what interests you
 
 ## How it works
 
-1. Choose a starting place or click a location on the map.
+1. Choose an imported place suggestion, a popular starting-point shortcut, or click the map.
 2. Select your interests, a search radius and the number of stops.
 3. Explore the suggested stops using the map and an ordered list of places.
 4. Follow your quest journey, mark stops as visited and keep track of your progress.
@@ -16,6 +16,12 @@ Instead of following a fixed tour, you choose where to start, what interests you
 The next discovery is the first stop you have not marked visited. Journey cards
 distinguish Next stop, Upcoming and Visited; completing the checklist reveals a
 Quest complete panel. Progress is self-reported, not verified by GPS.
+
+After generation, the journey replaces the builder beside the map on desktop and
+scrolls independently. On mobile, a compact next-stop panel provides visit/undo
+actions beneath the map and opens the full journey when needed. **Edit quest**
+returns to the existing builder; apply edits with regeneration, or return to the
+saved quest without applying them.
 
 The map shows the starting point, search area, numbered stops and a suggested sequence connecting them. Each stop includes a description, category and distance information.
 
@@ -189,3 +195,8 @@ request routes again. Regeneration or changed stops invalidate the cached result
 Failures are also reused for the page lifetime; reload or regenerate later to retry.
 No key is required to use the straight-line fallback. See [FRONTEND_TESTING.md](FRONTEND_TESTING.md#optional-walking-route)
 and [API.md](API.md#optional-pedestrian-route).
+
+Starting-place autocomplete searches the imported database only; it is not an
+address geocoder. Three separately labelled popular starting points use published
+reference coordinates and are not verified entrances or extra destinations. Their
+sources are recorded in [DATA_SOURCES.md](DATA_SOURCES.md#popular-starting-point-shortcuts-ui-constants-only).

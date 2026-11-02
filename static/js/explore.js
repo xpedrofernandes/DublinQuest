@@ -8,6 +8,34 @@
   let map, startMarker, radiusLayer, adventureLayer, spatialLayer, walkingLayer, straightLayer;
   const walkingCache = new Map();
   const stopMarkers = new Map();
+  const mobileLayout = window.matchMedia('(max-width: 700px)');
+  let editingQuest = false, lastQuickStop = null, pendingQuestFocus = null;
+  let searchTimer, searchVersion = 0, searchMatches = [], searchIndex = -1;
+  // Published reference coordinates, checked 2 Nov 2026; not entrance claims.
+  // Wikidata P625: Q258464, Q1432605, Q920229 (CC0). See DATA_SOURCES.md.
+  const popularStarts = [
+    {name: 'Trinity College Dublin', lat: 53.3444444444, lng: -6.2577777778},
+    {name: 'St Stephen’s Green', lat: 53.3380555556, lng: -6.2591666667},
+    {name: 'Temple Bar', lat: 53.3455875, lng: -6.2627777778}
+  ];
+  function arrangeQuest() {
+    const active = Boolean(state.adventure);
+    document.body.classList.toggle('quest-active', active);
+    document.body.classList.toggle('quest-editing', active && editingQuest);
+    $('builder').hidden = active && !editingQuest;
+    $('adventure-section').hidden = !active || editingQuest;
+    for (const id of ['return-quest', 'edit-explanation', 'apply-regenerate']) $(id).hidden = !active;
+    $('map-edit').hidden = !active;
+    $('map-route-summary').hidden = !active;
+    const slot = mobileLayout.matches ? $('mobile-next-slot') : $('journey-next-slot');
+    if ($('next-discovery').parentElement !== slot) slot.append($('next-discovery'));
+    requestAnimationFrame(() => map.invalidateSize({pan: false}));
+  }
+  function editQuest() {
+    editingQuest = true; arrangeQuest();
+    $('builder').focus({preventScroll: true});
+    if (mobileLayout.matches) $('builder').scrollIntoView({block: 'start'});
+  }
 
   function node(tag, text, className) {
     const element = document.createElement(tag);
@@ -66,6 +94,7 @@
       state.busy = false;
       updateStartControls();
       drawWalking();
+      if (pendingQuestFocus) { pendingQuestFocus.focus({preventScroll: true}); pendingQuestFocus = null; }
     }
   }
   function updateStartControls() {
@@ -142,9 +171,12 @@
     if (!marker) return;
     map.setView(marker.getLatLng(), 17);
     marker.openPopup();
-    $('map').scrollIntoView({block: 'center'});
+    for (const item of stopMarkers.values()) item.getElement()?.classList.remove('focused-pin');
+    marker.getElement()?.classList.add('focused-pin');
+    if (mobileLayout.matches) $('map-panel').scrollIntoView({block: 'start'});
   }
   function renderAdventure(adventure, fit = true, focus = false, openWalking = false) {
+    const journeyScroll = $('adventure-section').scrollTop;
     const geometryKey = JSON.stringify([adventure.id, adventure.path, adventure.stops.map(stop => [stop.id, stop.place.geometry])]);
     const changed = state.geometryKey !== geometryKey;
     if (changed) {
@@ -192,7 +224,14 @@
       $('next-name').textContent = nextStop.place.properties.name;
       $('next-description').textContent = `Stop ${nextStop.position} · ${labels[nextStop.place.properties.category]} · First stop not yet marked visited`;
       $('next-map').onclick = () => focusStop(nextStop);
+      $('quick-visit').onclick = () => {
+        lastQuickStop = nextStop.id;
+        document.querySelector(`[data-stop-id="${nextStop.id}"] input`).click();
+      };
     }
+    const undoStop = adventure.stops.find(stop => stop.id === lastQuickStop && stop.visited);
+    $('quick-undo').hidden = !undoStop;
+    $('quick-undo').onclick = () => { if (undoStop) document.querySelector(`[data-stop-id="${undoStop.id}"] input`).click(); };
     const list = $('stop-list'); list.replaceChildren();
     for (const stop of adventure.stops) {
       const feature = stop.place, properties = feature.properties;
@@ -203,6 +242,11 @@
       const card = node('li', undefined, `stop-card ${stop.visited ? 'visited' : isNext ? 'next-stop' : 'upcoming'}`);
       if (isNext) card.setAttribute('aria-current', 'step');
       card.dataset.stopId = stop.id;
+      card.tabIndex = 0;
+      card.addEventListener('click', event => { if (!event.target.closest('a,button,input,label,summary')) focusStop(stop); });
+      card.addEventListener('keydown', event => {
+        if (event.target === card && ['Enter', ' '].includes(event.key)) { event.preventDefault(); focusStop(stop); }
+      });
       card.append(node('span', String(stop.position), 'stop-number'));
       const content = node('div');
       const cardHeading = node('div', undefined, 'stop-card-heading');
@@ -228,7 +272,10 @@
           catch (error) { checkbox.checked = stop.visited; throw error; }
           renderAdventure(updated, false);
           const replacement = document.querySelector(`[data-stop-id="${stop.id}"] input`);
-          if (replacement) replacement.focus({preventScroll: true});
+          if (mobileLayout.matches && !$('journey-details').open) {
+            const control = $('next-discovery').hidden ? $('completion').querySelector('a') : $('quick-visit');
+            pendingQuestFocus = control;
+          } else if (replacement) replacement.focus({preventScroll: true});
           tell(updated.progress.complete ? 'Adventure complete! All stops are marked visited.' : 'Progress saved.');
           await refreshSaved();
         });
@@ -237,10 +284,19 @@
       controls.append(label, button('Show on map', () => focusStop(stop)));
       content.append(controls, sourceDetails(feature)); card.append(content); list.append(card);
     }
-    $('adventure-section').hidden = false; $('welcome').hidden = true;
+    if (changed || focus || openWalking) editingQuest = false;
+    arrangeQuest();
+    $('welcome').hidden = true;
     drawWalking();
     if (fit) fitResults();
-    if (focus) $('adventure-heading').focus({preventScroll: false});
+    if (focus) {
+      document.querySelector('.explore-layout').scrollIntoView({block: 'start'});
+      $('adventure-heading').focus({preventScroll: true});
+    } else {
+      $('adventure-section').scrollTop = journeyScroll;
+      // Keep browser focus/scroll anchoring inside the desktop workspace after a save.
+      if (!mobileLayout.matches && !editingQuest) document.querySelector('.explore-layout').scrollIntoView({block: 'start'});
+    }
     if (changed || openWalking) void loadWalking(adventure.id, geometryKey);
   }
   function clearWalking() {
@@ -290,6 +346,12 @@
       ? `${metres(route.distance_m)} · ${(route.duration_s / 60).toFixed(1)} min estimated walking`
       : `${metres(state.adventure.total_distance_m)} of straight-line connections`;
     $('route-type').textContent = visible ? 'Walking estimate' : state.walkingLoading ? 'Calculating walking route' : 'Straight-line sequence';
+    $('map-route-metrics').textContent = $('distance-summary').textContent;
+    $('map-route-status').textContent = state.walkingLoading || state.walkingDetail ? $('walking-status').textContent : visible ? 'Times exclude visits; access and entrances are not verified.' : 'Straight-line sequence, not walking directions.';
+    $('map-route-warning').textContent = route ? route.warnings.join(' ') : '';
+    $('map-route-toggle').hidden = !route;
+    $('map-route-toggle').disabled = $('walking-route').disabled;
+    $('map-route-toggle').textContent = $('walking-route').textContent;
     if (!visible) return;
     L.geoJSON(route.route, {style: {color: '#2267bd', weight: 5, opacity: .85}}).addTo(walkingLayer);
     $('walking-metrics').textContent = `${metres(route.distance_m)} estimated walking distance · ${(route.duration_s / 60).toFixed(1)} minutes walking`;
@@ -313,24 +375,54 @@
     }
     state.savedNext = data.next; $('more-saved').hidden = !data.next;
   }
-  async function searchPlaces(event) {
-    event.preventDefault();
-    const search = $('place-search').value.trim();
-    if (!search) { tell('Enter a place name to search.', true); return; }
-    await run('Searching Dublin places…', async () => {
-      const data = await api(`/api/places/?search=${encodeURIComponent(search)}&page_size=20`);
-      const results = $('search-results'); results.replaceChildren();
-      for (const feature of data.features) {
-        const choice = button(feature.properties.name, () => {
-          const [lng, lat] = feature.geometry.coordinates;
-          chooseStart(lat, lng, feature.properties.name);
-          results.replaceChildren(); $('generate').focus();
-        }, 'search-choice');
-        choice.append(node('small', `${labels[feature.properties.category]}${feature.properties.category === 'park' ? ' · not a verified entrance' : ''}`));
-        results.append(choice);
-      }
-      tell(data.count ? `${data.count} matching places. ${data.count > 20 ? 'Showing the first 20; refine your search for more specific results.' : 'Choose one as your start.'}` : 'No matching places. Try a shorter name or click the map.');
+  function closeSuggestions() {
+    clearTimeout(searchTimer); searchVersion++;
+    searchMatches = []; searchIndex = -1;
+    $('search-results').replaceChildren();
+    $('place-search').setAttribute('aria-expanded', 'false');
+    $('place-search').removeAttribute('aria-activedescendant');
+  }
+  function selectSuggestion(feature) {
+    const [lng, lat] = feature.geometry.coordinates;
+    closeSuggestions();
+    chooseStart(lat, lng, feature.properties.name);
+    $('search-status').textContent = 'Starting place selected.';
+    $('generate').focus();
+  }
+  function highlightSuggestion(index) {
+    searchIndex = index;
+    [...$('search-results').children].forEach((choice, i) => {
+      choice.setAttribute('aria-selected', String(i === index));
+      choice.classList.toggle('suggestion-active', i === index);
     });
+    const choice = $('search-results').children[index];
+    if (choice) { $('place-search').setAttribute('aria-activedescendant', choice.id); choice.scrollIntoView({block: 'nearest'}); }
+  }
+  async function searchPlaces(event) {
+    if (event) event.preventDefault();
+    clearTimeout(searchTimer);
+    const search = $('place-search').value.trim();
+    const version = ++searchVersion;
+    searchMatches = []; searchIndex = -1; $('search-results').replaceChildren();
+    $('place-search').removeAttribute('aria-activedescendant');
+    $('place-search').setAttribute('aria-expanded', 'false');
+    if (search.length < 2) { $('search-status').textContent = 'Type at least two characters for imported place suggestions.'; return; }
+    $('search-status').textContent = 'Searching imported places…';
+    try {
+      const data = await api(`/api/places/?search=${encodeURIComponent(search)}&page_size=20`);
+      if (version !== searchVersion) return;
+      searchMatches = data.features;
+      for (const [index, feature] of searchMatches.entries()) {
+        const choice = button(feature.properties.name, () => selectSuggestion(feature), 'search-choice');
+        choice.id = `place-suggestion-${index}`;
+        choice.tabIndex = -1; choice.setAttribute('role', 'option'); choice.setAttribute('aria-selected', 'false');
+        choice.append(node('small', `${labels[feature.properties.category]}${feature.properties.category === 'park' ? ' · not a verified entrance' : ''}`));
+        $('search-results').append(choice);
+      }
+      $('place-search').setAttribute('aria-expanded', String(searchMatches.length > 0));
+      $('search-status').textContent = data.count ? `${data.count} imported matches. Use ↑/↓ and Enter to select.${data.count > 20 ? ' First 20 shown; refine your search.' : ''}` : 'No imported matches. Try a popular starting point or click the map.';
+      tell(data.count ? 'Choose an imported place suggestion or a popular starting point.' : 'No matching places. Try a popular starting point or click the map.');
+    } catch (error) { if (version === searchVersion) $('search-status').textContent = error.message; }
   }
   async function allFeatures(url) {
     const features = []; let first;
@@ -391,8 +483,37 @@
     });
     adventureLayer = L.featureGroup().addTo(map); spatialLayer = L.featureGroup().addTo(map); walkingLayer = L.featureGroup().addTo(map);
     L.control.scale({imperial: false}).addTo(map);
-    map.on('click', event => { if (!state.busy) chooseStart(event.latlng.lat, event.latlng.lng, 'Map selection', false); });
-    $('place-search-form').addEventListener('submit', searchPlaces);
+    map.on('click', event => {
+      if (!state.busy) { if (state.adventure) editQuest(); chooseStart(event.latlng.lat, event.latlng.lng, 'Map selection', false); }
+    });
+    $('place-search-form').addEventListener('submit', event => {
+      event.preventDefault();
+      if (searchIndex >= 0) selectSuggestion(searchMatches[searchIndex]);
+      else void searchPlaces();
+    });
+    $('place-search').addEventListener('input', () => {
+      closeSuggestions();
+      searchTimer = setTimeout(() => void searchPlaces(), 300);
+    });
+    $('place-search').addEventListener('keydown', event => {
+      if (event.key === 'Escape' || event.key === 'Tab') { closeSuggestions(); return; }
+      if (['ArrowDown', 'ArrowUp'].includes(event.key) && searchMatches.length) {
+        event.preventDefault();
+        highlightSuggestion(searchIndex < 0 ? (event.key === 'ArrowDown' ? 0 : searchMatches.length - 1) : (searchIndex + (event.key === 'ArrowDown' ? 1 : -1) + searchMatches.length) % searchMatches.length);
+      }
+    });
+    document.addEventListener('pointerdown', event => { if (!event.target.closest('#place-search-form,#search-results')) closeSuggestions(); });
+    for (const point of popularStarts) $('popular-starts').append(button(point.name, () => { closeSuggestions(); chooseStart(point.lat, point.lng, `${point.name} · popular start`); }, 'search-choice'));
+    $('edit-quest').addEventListener('click', editQuest);
+    $('map-edit').addEventListener('click', editQuest);
+    document.querySelectorAll('[data-edit-quest]').forEach(link => link.addEventListener('click', event => { event.preventDefault(); editQuest(); }));
+    $('return-quest').addEventListener('click', () => renderAdventure(state.adventure, true, true));
+    $('apply-regenerate').addEventListener('click', () => $('regenerate').click());
+    $('quest-data').addEventListener('click', () => { editQuest(); document.querySelector('.spatial-tools').open = true; document.querySelector('.spatial-tools').scrollIntoView({block: 'nearest'}); });
+    $('map-route-toggle').addEventListener('click', () => $('walking-route').click());
+    $('open-journey').addEventListener('click', () => { $('journey-details').open = true; $('journey-details').scrollIntoView({block: 'start'}); });
+    mobileLayout.addEventListener('change', () => { $('journey-details').open = !mobileLayout.matches; arrangeQuest(); });
+    $('journey-details').open = !mobileLayout.matches;
     $('clear-start').addEventListener('click', () => {
       state.start = null; $('start-label').textContent = 'No location selected'; $('clear-start').hidden = true; drawStart(); clearSpatial(); updateStartControls(); tell('Choose a new starting point. Saved adventures are unchanged.');
     });
@@ -439,7 +560,7 @@
       run('Deleting adventure…', async () => {
         await api(`/api/adventures/${state.adventure.id}/`, 'DELETE');
         for (const [key, entry] of walkingCache) { if (entry.id === state.adventure.id) walkingCache.delete(key); }
-        state.adventure = null; clearWalking(); state.geometryKey = null; adventureLayer.clearLayers(); stopMarkers.clear(); $('adventure-section').hidden = true; $('welcome').hidden = false; $('journey-link').hidden = true;
+        state.adventure = null; clearWalking(); state.geometryKey = null; adventureLayer.clearLayers(); stopMarkers.clear(); $('adventure-section').hidden = true; $('welcome').hidden = false; $('journey-link').hidden = true; arrangeQuest();
         tell('Adventure deleted. Your imported places and parks are unchanged.'); await refreshSaved(); $('saved-heading').scrollIntoView({block: 'center'});
       });
     });

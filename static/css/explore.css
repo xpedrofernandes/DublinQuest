@@ -1259,6 +1259,57 @@ button:disabled {
     width:100%;
   }
 }
+/* Quest workspace: the existing journey replaces the builder after generation. */
+.journey-toolbar,.map-controls { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+.journey-toolbar { margin-bottom:14px; }
+.next-actions { display:flex; flex-direction:column; gap:6px; }
+#quick-visit,#quick-undo,#open-journey { display:none; }
+#journey-details > summary { min-height:46px; align-content:center; font-weight:700; cursor:pointer; }
+#journey-details[open] > summary { margin-bottom:16px; }
+.map-route-summary { padding:12px 16px; background:#f1f5ed; border-top:1px solid var(--line); font-size:.82rem; }
+.map-route-summary p { margin:5px 0 0; font-size:.76rem; }
+.popular-starts { border-bottom:1px solid var(--line); padding:10px 0; margin-bottom:14px; }
+#search-results { max-height:260px; overflow-y:auto; }
+.search-choice.suggestion-active { background:#e4eedb; outline:2px solid var(--forest); outline-offset:-2px; }
+.focused-pin span { outline:3px solid #b54d27; outline-offset:3px; }
+.stop-card:focus-visible { outline:3px solid #94401f; outline-offset:2px; }
+.quest-active .intro { display:none; }
+.quest-active .explore-layout { grid-template-columns:minmax(360px,440px) minmax(0,1fr); height:calc(100dvh - 32px); scroll-margin-top:16px; }
+.quest-active #adventure-section,.quest-active #builder { height:100%; overflow-y:auto; min-height:0; overscroll-behavior:contain; overflow-anchor:none; scrollbar-gutter:stable; padding:18px; }
+.quest-active .map-and-results { height:100%; min-height:0; display:flex; flex-direction:column; }
+.quest-active .map-frame { flex:1; min-height:0; display:flex; flex-direction:column; }
+.quest-active #map { height:auto; flex:1; min-height:240px; }
+.quest-active #spatial-section { max-height:40%; overflow-y:auto; flex-shrink:0; }
+.quest-active .quest-header { padding:18px; }
+.quest-active .quest-header h2 { font-size:1.5rem; }
+.quest-active .next-discovery { align-items:stretch; flex-direction:column; padding:14px; }
+.quest-active .next-discovery .btn { width:100%; }
+.quest-active .stop-controls { flex-wrap:wrap; }
+#mobile-next-slot:empty { display:none; }
+@media(min-width:701px) {
+  #journey-details > summary { display:none; }
+}
+@media(max-width:1000px) and (min-width:701px) {
+  .quest-active .explore-layout { grid-template-columns:minmax(300px,360px) minmax(0,1fr); gap:12px; }
+}
+@media(max-width:700px) {
+  .quest-active .explore-layout { display:flex; flex-direction:column; height:auto; }
+  .quest-active #adventure-section,.quest-active #builder { height:auto; overflow:visible; scrollbar-gutter:auto; }
+  .quest-active .map-and-results { height:auto; order:1; }
+  .quest-active #adventure-section { order:2; }
+  .quest-active #builder { order:0; }
+  .quest-active .map-frame { flex:auto; }
+  .quest-active #map { height:clamp(320px,42dvh,430px); flex:auto; }
+  .quest-active #spatial-section { max-height:none; }
+  .quest-active #next-discovery { margin:0; }
+  .quest-editing #mobile-next-slot { display:none; }
+  #quick-visit,#open-journey { display:block; }
+  #quick-undo:not([hidden]) { display:block; }
+  #mobile-next-slot .next-actions { display:grid; grid-template-columns:1fr 1fr; }
+  #quick-visit { grid-column:1 / -1; }
+  .quest-active .map-note { display:none; }
+  .quest-active .map-route-summary { padding:10px 12px; }
+}
 @media(prefers-reduced-motion:reduce) {
   * {
     scroll-behavior:auto!important;

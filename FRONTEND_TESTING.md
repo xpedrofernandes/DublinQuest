@@ -224,3 +224,46 @@ The browser regression covers these progression cases and automatic routing-cach
 behaviour with mocked external services. The design was also inspected in headed
 Chrome at 1440, 820 and 390 px, including reduced-motion preference, mobile links
 and completion. This is a focused usability check, not a formal accessibility audit.
+
+## Map/journey workspace and local autocomplete
+
+1. Start at `/`. Type **Thomas Moo** and wait briefly: imported matches appear
+   without pressing Search. Arrow Down/Up changes the active suggestion; Enter
+   selects it; Escape dismisses it. Tab continues normal keyboard navigation.
+   Queries are debounced by 300 ms, and late replies cannot replace newer results.
+2. Search **Trinity College**. If there is no imported match, the empty state points
+   to the separate popular shortcuts and map click. Select **Trinity College
+   Dublin**, **St Stephen’s Green** or **Temple Bar** to use that reference location.
+   These are not new imported attractions or verified entrances; sources are in
+   DATA_SOURCES.md and linked beside the shortcuts.
+3. Generate a quest. On desktop/tablet, the builder is replaced by the journey on
+   the left; scroll it down and mark/unmark a stop. The right-hand map should remain
+   visible, with route metrics/controls and attribution. Click a card or focus it
+   and press Enter/Space: the matching marker opens and gains an orange outline.
+4. Select **Edit quest**. Change categories/radius/stops/start, then choose
+   **Regenerate this quest with edits** and confirm. The same saved quest gets the
+   new criteria, stops and geometry through the existing API. **Build my quest**
+   instead creates a new saved quest. **Return to saved quest** discards unapplied
+   edits and restores its map/journey view.
+5. **Spatial tools** opens the builder's existing independent query controls.
+   These searches and their GeoJSON layers still work. Rename, deletion and saved
+   adventures remain available; detailed route information is below the journey.
+6. At phone widths, Next discovery is just below the map. **Mark next stop visited**
+   saves through the same stop checkbox handler; **Undo last mark** reverses it.
+   Focus stays on a usable nearby control. **Full journey** opens the native details
+   section for any stop, including out-of-order visits or unvisiting older stops.
+   No drawer covers the map or attribution.
+7. Reopen a saved quest and repeat progress changes. Automatic routing/cache reuse
+   should remain unchanged. Normal mobile map height is at least 320 px; with
+   desktop spatial results shown, the map and query results share the right panel.
+
+The focused test uses mocked routing and tiles and removes only its temporary
+adventure:
+
+```bash
+/tmp/dq-browser-env/bin/python tests/browser/test_workspace.py
+```
+
+Run it alongside the existing `test_explore.py` regression. Desktop scroll/save,
+keyboard card focus, editor regeneration, mobile quick controls/full journey,
+responsive overflow and saved-route caching are checked independently.

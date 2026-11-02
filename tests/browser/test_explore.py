@@ -49,13 +49,17 @@ def main():
             page.wait_for_function("!document.querySelector('main').hasAttribute('aria-busy')")
 
         def click(selector):
+            if selector == '#regenerate' and not page.locator(selector).is_visible():
+                if not page.locator('#builder').is_visible():
+                    page.locator('#map-edit').click()
+                selector = '#apply-regenerate'
             page.locator(selector).click()
             idle()
 
         def search_start():
             page.locator('#place-search').fill('Thomas Moore')
             click('#place-search-form button')
-            assert page.locator('#search-results button').count() > 0
+            page.wait_for_selector('#search-results button')
             click('#search-results button >> nth=0')
             assert 'Thomas Moore' in page.locator('#start-label').inner_text()
 
@@ -73,6 +77,22 @@ def main():
             assert 'Map selection' in page.locator('#start-label').inner_text()
             click('#clear-start')
             assert page.locator('#generate').is_disabled()
+            for name, lat, lng in [('Trinity College Dublin',53.3444444444,-6.2577777778),('St Stephen’s Green',53.3380555556,-6.2591666667),('Temple Bar',53.3455875,-6.2627777778)]:
+                page.get_by_role('button', name=name, exact=True).click()
+                assert name in page.locator('#start-label').inner_text()
+                assert f'{lat:.5f}' in page.locator('#start-label').inner_text()
+                assert f'{lng:.5f}' in page.locator('#start-label').inner_text()
+            page.locator('#place-search').fill('Thomas Moo')
+            page.wait_for_selector('#search-results button')
+            page.locator('#place-search').press('ArrowDown')
+            assert page.locator('#place-search').get_attribute('aria-activedescendant')
+            page.locator('#place-search').press('Escape')
+            assert page.locator('#search-results button').count() == 0
+            page.locator('#place-search').fill('Thomas Moor')
+            page.wait_for_selector('#search-results button')
+            page.locator('#place-search').press('ArrowDown')
+            page.locator('#place-search').press('Enter')
+            assert 'Thomas Moore' in page.locator('#start-label').inner_text()
             search_start()
             page.locator('#adventure-title').fill('Browser test — temporary')
             with page.expect_response(lambda response: response.url.endswith('/api/adventures/') and response.request.method == 'POST') as generation:
@@ -87,6 +107,14 @@ def main():
             page.wait_for_selector('#walking-spinner:not([hidden])')
             assert page.locator('#generate').is_enabled()
             assert page.locator('#stop-list > li').count() == 5
+            assert page.locator('#builder').is_hidden()
+            page.wait_for_timeout(300)  # Wait for the workspace's Leaflet resize frame.
+            map_before = page.locator('#map').bounding_box()
+            page.locator('#adventure-section').evaluate('(element) => element.scrollTop = element.scrollHeight')
+            map_after = page.locator('#map').bounding_box()
+            assert abs(map_before['y'] - map_after['y']) < 5, (map_before,map_after)
+            assert map_after['y'] >= 0 and map_after['y'] + map_after['height'] <= 1050
+            page.locator('#adventure-section').evaluate('(element) => element.scrollTop = 0')
             assert page.locator('#map path[stroke="#204a3b"]').count() == 1
             assert page.locator('#stop-list input').first.is_enabled()
             routing_mode['hold'] = False
@@ -125,6 +153,8 @@ def main():
                 lng, lat = stop['place']['geometry']['coordinates']
                 assert -6.5 < lng < -6.0 and 53.1 < lat < 53.6
             assert 'not' in page.locator('#sequence-notice').inner_text().lower()
+            page.locator('#stop-list li:first-child h3').click()
+            assert page.locator('.focused-pin').count() == 1
             click('#stop-list li:first-child .text-button')
             assert page.locator('.leaflet-popup').is_visible()
             page.locator('.leaflet-popup-close-button').click()
@@ -149,6 +179,13 @@ def main():
             assert page.locator('.leaflet-popup').is_visible()
             page.locator('.leaflet-popup-close-button').click()
 
+            click('#edit-quest')
+            assert page.locator('#builder').is_visible()
+            page.locator('#stop-count').fill('4')
+            click('#return-quest')
+            assert page.locator('#builder').is_hidden()
+            assert page.locator('#stop-count').input_value() == '5'
+            click('#edit-quest')
             # All three independent spatial query controls, including pagination.
             click('#nearby')
             assert page.locator('#spatial-list > article').count() > 100
@@ -175,6 +212,7 @@ def main():
             # Empty and error feedback keep the current saved adventure intact.
             page.locator('#place-search').fill('zzzznotarealplace')
             click('#place-search-form button')
+            page.wait_for_function("document.querySelector('#search-status').textContent.includes('No imported matches')")
             assert 'No matching places' in page.locator('#feedback').inner_text()
             for checkbox in page.locator('[name=category]').all(): checkbox.uncheck()
             click('#generate')
@@ -194,7 +232,7 @@ def main():
                 page.wait_for_timeout(250)
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), name
                 assert page.locator('#generate').is_visible()
-                assert page.locator('#map').evaluate('(element) => element.getBoundingClientRect().height') >= 350
+                assert page.locator('#map').evaluate('(element) => element.getBoundingClientRect().height') >= 240
                 page.screenshot(path=f'/tmp/dublinquest-{name}.png', full_page=True)
             page.set_viewport_size({'width': 1440, 'height': 1050})
             # Actual session isolation and CSRF rejection from separate browser context.
@@ -210,6 +248,7 @@ def main():
             page.once('dialog', lambda dialog: dialog.accept())
             click('#regenerate')
             assert page.locator('#stop-list > li').count() == 3
+            assert page.locator('#builder').is_hidden()
             assert page.locator('#quest-stop-count').inner_text() == '3 discoveries'
             assert '0 of 3' in page.locator('#progress-label').inner_text()
             assert page.locator('#walking-summary').is_hidden()
