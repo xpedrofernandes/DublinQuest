@@ -185,7 +185,7 @@ docker compose up -d --wait web
 The key is used exclusively by Django, never JavaScript. Requests send only the
 ordered waypoint coordinates and routing options to HeiGIT. Walking routes load in the background after generating or opening an adventure;
 stops and controls remain usable while a loading indicator is shown. The solid
-blue line becomes the primary view, with estimated walking distance/time. Use
+coloured walking route becomes the primary view, with estimated walking distance/time. Use
 **View straight-line sequence** to compare the original geometry without another
 request. Provider
 errors, missing configuration or unroutable points fall back without affecting

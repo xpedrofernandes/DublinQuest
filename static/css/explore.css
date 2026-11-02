@@ -1317,3 +1317,11 @@ button:disabled {
   }
 
 }
+
+/* Progress remains readable through numbers, symbols and explicit labels. */
+.quest-pin.visited-pin span { background:#12634f; font-size:12px; }
+.quest-pin.next-pin span { outline:3px solid #b95320; outline-offset:2px; font-size:12px; }
+.route-legend { display:flex; flex-wrap:wrap; gap:4px 12px; font-size:.72rem; }
+.route-legend-item { display:inline-flex; align-items:center; gap:5px; }
+.route-legend-item i { width:18px; height:5px; border-radius:3px; flex-shrink:0; }
+.popup-visit { margin-top:6px; min-height:44px; }

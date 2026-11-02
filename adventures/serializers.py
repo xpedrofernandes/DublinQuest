@@ -127,6 +127,7 @@ class WalkingRouteSerializer(serializers.Serializer):
     route = serializers.JSONField(required=False)
     distance_m = serializers.FloatField(required=False)
     duration_s = serializers.FloatField(required=False)
+    way_points = serializers.ListField(child=serializers.IntegerField(min_value=0), required=False)
     waypoints = serializers.ListField(child=serializers.DictField(), required=False)
     warnings = serializers.ListField(child=serializers.CharField(), required=False)
     notice = serializers.CharField(required=False)

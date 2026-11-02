@@ -108,9 +108,9 @@
     return {lat: state.start.lat, lng: state.start.lng, categories: selected, radius_m: Number($('radius').value), stop_count: Number($('stop-count').value), title: $('adventure-title').value.trim() || 'Dublin adventure'};
   }
   const metres = value => value >= 1000 ? `${(value / 1000).toFixed(2)} km` : `${Math.round(value)} m`;
-  function icon(text, category = '', visited = false) {
+  function icon(text, category = '', visited = false, next = false) {
     // Only fixed labels, category codes and server-generated integers enter HTML.
-    return L.divIcon({className: `quest-pin ${category} ${visited ? 'visited-pin' : ''}`, html: `<span>${text}</span>`, iconSize: [34, 34], iconAnchor: [17, 17]});
+    return L.divIcon({className: `quest-pin ${category} ${visited ? 'visited-pin' : next ? 'next-pin' : ''}`, html: `<span>${text}${visited ? ' ✓' : next ? ' ↗' : ''}</span>`, iconSize: [34, 34], iconAnchor: [17, 17]});
   }
   function popup(feature, title) {
     const content = node('div');
@@ -236,9 +236,18 @@
     for (const stop of adventure.stops) {
       const feature = stop.place, properties = feature.properties;
       const [stopLng, stopLat] = feature.geometry.coordinates;
-      const marker = L.marker([stopLat, stopLng], {icon: icon(stop.position, properties.category, stop.visited), title: `${stop.position}. ${properties.name}`, alt: `Stop ${stop.position}: ${properties.name}`}).addTo(adventureLayer).bindPopup(popup(feature, `${stop.position}. ${properties.name}`));
-      stopMarkers.set(stop.id, marker);
       const isNext = nextStop && stop.id === nextStop.id;
+      const statusLabel = stop.visited ? 'Visited' : isNext ? 'Next discovery' : 'Upcoming';
+      const contentPopup = popup(feature, `${stop.position}. ${properties.name}`);
+      contentPopup.append(node('p', `${statusLabel} · completion is user-reported.`));
+      const visitButton = button(stop.visited ? 'Mark unvisited' : 'Mark visited', () => updateStop(adventure, stop, !stop.visited, null, true), 'btn btn-outline-dark popup-visit');
+      contentPopup.append(visitButton);
+      const marker = L.marker([stopLat, stopLng], {
+        icon: icon(stop.position, properties.category, stop.visited, isNext),
+        title: `${stop.position}. ${properties.name} · ${statusLabel}`,
+        alt: `Stop ${stop.position}: ${properties.name} · ${statusLabel}`
+      }).addTo(adventureLayer).bindPopup(contentPopup);
+      stopMarkers.set(stop.id, marker);
       const card = node('li', undefined, `stop-card ${stop.visited ? 'visited' : isNext ? 'next-stop' : 'upcoming'}`);
       if (isNext) card.setAttribute('aria-current', 'step');
       card.dataset.stopId = stop.id;
@@ -263,23 +272,7 @@
       const label = node('label', undefined, 'visit-toggle');
       const checkbox = node('input'); checkbox.type = 'checkbox'; checkbox.checked = stop.visited;
       checkbox.setAttribute('aria-label', `Mark ${properties.name} as visited`);
-      checkbox.addEventListener('change', () => {
-        if (state.busy) { checkbox.checked = stop.visited; return; }
-        const visited = checkbox.checked;
-        run('Saving your progress…', async () => {
-          let updated;
-          try { updated = await api(`/api/adventures/${adventure.id}/stops/${stop.id}/`, 'PATCH', {visited}); }
-          catch (error) { checkbox.checked = stop.visited; throw error; }
-          renderAdventure(updated, false);
-          const replacement = document.querySelector(`[data-stop-id="${stop.id}"] input`);
-          if (mobileLayout.matches && !$('journey-details').open) {
-            const control = $('next-discovery').hidden ? $('completion').querySelector('a') : $('quick-visit');
-            pendingQuestFocus = control;
-          } else if (replacement) replacement.focus({preventScroll: true});
-          tell(updated.progress.complete ? 'Adventure complete! All stops are marked visited.' : 'Progress saved.');
-          await refreshSaved();
-        });
-      });
+      checkbox.addEventListener('change', () => updateStop(adventure, stop, checkbox.checked, checkbox));
       label.append(checkbox, node('span', stop.visited ? 'Marked visited' : 'Mark visited'));
       controls.append(label, button('Show on map', () => focusStop(stop)));
       content.append(controls, sourceDetails(feature)); card.append(content); list.append(card);
@@ -298,6 +291,27 @@
       if (!mobileLayout.matches && !editingQuest) document.querySelector('.explore-layout').scrollIntoView({block: 'start'});
     }
     if (changed || openWalking) void loadWalking(adventure.id, geometryKey);
+  }
+  // One mutation path for journey checkboxes and map popup controls.
+  function updateStop(adventure, stop, visited, checkbox = null, fromPopup = false) {
+    if (state.busy) { if (checkbox) checkbox.checked = stop.visited; return; }
+    run('Saving your progress…', async () => {
+      let updated;
+      try { updated = await api(`/api/adventures/${adventure.id}/stops/${stop.id}/`, 'PATCH', {visited}); }
+      catch (error) { if (checkbox) checkbox.checked = stop.visited; throw error; }
+      renderAdventure(updated, false);
+      if (fromPopup) {
+        const marker = stopMarkers.get(stop.id);
+        marker.openPopup();
+        pendingQuestFocus = marker.getPopup().getElement().querySelector('.popup-visit');
+      } else if (mobileLayout.matches && !$('journey-details').open) {
+        pendingQuestFocus = $('next-discovery').hidden ? $('completion').querySelector('a') : $('quick-visit');
+      } else {
+        pendingQuestFocus = document.querySelector(`[data-stop-id="${stop.id}"] input`);
+      }
+      tell(updated.progress.complete ? 'Adventure complete! All stops are marked visited.' : 'Progress saved.');
+      await refreshSaved();
+    });
   }
   function clearWalking() {
     state.walking = null; state.walkingVisible = false; state.walkingLoading = false; state.walkingDetail = null;
@@ -326,6 +340,7 @@
   function drawWalking() {
     if (!walkingLayer) return;
     walkingLayer.clearLayers();
+    $('route-legend').replaceChildren();
     const route = state.walking;
     const visible = Boolean(route && state.walkingVisible);
     $('walking-summary').hidden = !visible;
@@ -335,7 +350,7 @@
     $('walking-spinner').hidden = !state.walkingLoading;
     $('walking-status').textContent = state.walkingLoading
       ? 'Calculating walking route… Your stops are ready; you can continue using the adventure.'
-      : state.walkingDetail || (visible ? 'Walking route ready. Solid blue line follows mapped pedestrian ways.' : route ? 'Showing the original straight-line sequence.' : '');
+      : state.walkingDetail || (visible ? 'Walking route ready. Coloured legs follow mapped pedestrian ways.' : route ? 'Showing the original straight-line sequence.' : '');
     if (!state.adventure) return;
     if (straightLayer) {
       if (visible) adventureLayer.removeLayer(straightLayer);
@@ -353,11 +368,39 @@
     $('map-route-toggle').disabled = $('walking-route').disabled;
     $('map-route-toggle').textContent = $('walking-route').textContent;
     if (!visible) return;
-    L.geoJSON(route.route, {style: {color: '#2267bd', weight: 5, opacity: .85}}).addTo(walkingLayer);
+    const points = route.route.coordinates, indices = route.way_points;
+    const stops = state.adventure.stops;
+    // Use provider vertex indices, never straight-line interpolation or new requests.
+    const segmented = Array.isArray(indices) && indices.length === stops.length + 1
+      && indices.every((value, i) => Number.isInteger(value) && value >= 0 && value < points.length && (!i || value >= indices[i - 1]))
+      && indices[0] === 0 && indices[indices.length - 1] === points.length - 1;
+    if (segmented) {
+      const palette = ['#12634f', '#a04718', '#52549a', '#136b82', '#934c75', '#66601a', '#2f688e', '#8c433b', '#456d37', '#775397'];
+      const next = stops.find(stop => !stop.visited);
+      stops.forEach((stop, i) => {
+        const isNext = next && next.id === stop.id;
+        const status = stop.visited ? 'visited' : isNext ? 'next' : 'upcoming';
+        const color = stop.visited ? '#737b78' : palette[i % palette.length];
+        const label = `${i ? i : 'Start'} → ${stop.position} · ${status}${stop.visited ? ' ✓' : isNext ? ' ↗' : ''}`;
+        const coordinates = points.slice(indices[i], indices[i + 1] + 1).map(([lng, lat]) => [lat, lng]);
+        if (coordinates.length > 1) {
+          L.polyline(coordinates, {color: '#fff', weight: isNext ? 10 : 8, opacity: .95, interactive: false}).addTo(walkingLayer);
+          L.polyline(coordinates, {color, weight: isNext ? 7 : 5, opacity: 1,
+            className: `route-leg route-leg-${i + 1} ${status}-leg`}).bindTooltip(label).addTo(walkingLayer);
+        }
+        const item = node('span', label + (coordinates.length === 1 ? ' · same mapped waypoint' : ''), 'route-legend-item');
+        const swatch = node('i'); swatch.style.backgroundColor = color; swatch.setAttribute('aria-hidden', 'true');
+        item.prepend(swatch); $('route-legend').append(item);
+      });
+    } else {
+      // Older cached responses remain usable without another provider request.
+      L.geoJSON(route.route, {style: {color: '#12634f', weight: 5}}).addTo(walkingLayer);
+      $('route-legend').append(node('span', 'Walking route · individual leg information unavailable.'));
+    }
     $('walking-metrics').textContent = `${metres(route.distance_m)} estimated walking distance · ${(route.duration_s / 60).toFixed(1)} minutes walking`;
     $('walking-notice').textContent = route.notice;
     const maxSnap = Math.max(...route.waypoints.map(point => point.displacement_m));
-    $('walking-snapping').textContent = `Solid blue line: mapped pedestrian route. Maximum waypoint adjustment: ${maxSnap.toFixed(1)} m. Attraction markers have not moved; adjusted positions are not verified entrances.`;
+    $('walking-snapping').textContent = `Coloured legs: mapped pedestrian route. Grey means the destination is marked visited, not that the leg was walked. Maximum waypoint adjustment: ${maxSnap.toFixed(1)} m. Attraction markers have not moved; adjusted positions are not verified entrances.`;
     $('walking-warning').textContent = route.warnings.join(' ');
   }
   async function refreshSaved(append = false) {

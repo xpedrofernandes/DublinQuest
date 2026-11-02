@@ -79,7 +79,7 @@ def walking_route(path):
         # Whitelist output; never relay provider metadata, headers or error text.
         warnings = ["The provider reported a routing warning; road access information may be incomplete."] if properties.get("warnings") else []
         return {"status": "available", "route": clean_geometry, "distance_m": distance, "duration_s": duration,
-            "waypoints": waypoints, "warnings": warnings, "notice": NOTICE,
+            "way_points": indices, "waypoints": waypoints, "warnings": warnings, "notice": NOTICE,
             "attribution": "openrouteservice.org | OpenStreetMap contributors"}
     except urllib.error.HTTPError as error:
         if error.code in (401, 403, 429):

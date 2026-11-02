@@ -21,7 +21,7 @@ def main():
         def route(r):
             calls.append(r.request.url)
             quest = context.request.get(r.request.url.replace('walking-route/','')).json()
-            r.fulfill(json={'status':'available','route':quest['path'],'distance_m':1608.1,'duration_s':1157.8,
+            r.fulfill(json={'status':'available','route':quest['path'],'way_points':list(range(len(quest['path']['coordinates']))),'distance_m':1608.1,'duration_s':1157.8,
                 'notice':'Mock route estimate; entrances not verified.','warnings':[],'waypoints':[{'displacement_m':2.99}]})
         page.route('**/walking-route/',route)
         def idle(): page.wait_for_function("!document.querySelector('main').hasAttribute('aria-busy')")

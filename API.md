@@ -246,6 +246,7 @@ Successful HTTP 200:
   "route": {"type": "LineString", "coordinates": [[-6.26, 53.35], [-6.259, 53.35]]},
   "distance_m": 1608.1,
   "duration_s": 1157.8,
+  "way_points": [0, 12, 29, 45, 67, 98],
   "waypoints": [{"requested": [-6.26, 53.35], "snapped": [-6.26001, 53.35], "displacement_m": 0.67}],
   "warnings": [],
   "notice": "Estimated pedestrian route ...",
@@ -281,3 +282,5 @@ The current URL follows the provider's
 [HeiGIT migration](https://ask.openrouteservice.org/t/deprecating-api-openrouteservice-org-in-favour-of-api-heigit-org/7912).
 See the [official response documentation](https://giscience.github.io/openrouteservice/api-reference/endpoints/directions/requests-and-return-types)
 for geometry, summary and waypoint semantics.
+
+`way_points` contains validated vertex indices into the returned walking LineString, in origin/stop order. The map splits that cached geometry into incoming legs. Visit updates recolour legs without requesting routing or changing stored geometry. Adjacent equal indices mean the same snapped waypoint; no extra line is invented.

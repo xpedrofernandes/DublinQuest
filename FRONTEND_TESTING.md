@@ -165,12 +165,12 @@ key blank, the complete original adventure experience remains available.
 2. The stops and dashed fallback appear immediately, while **Calculating walking
    route…** and a spinner indicate the background request. Controls remain usable.
    The form discloses that coordinates are sent to HeiGIT through Django. On
-   success, a solid blue route and estimated distance/time become primary; the
+   success, a solid coloured route and estimated distance/time become primary; the
    dashed connection is hidden. **View straight-line sequence** switches views
    without another routing request; **View walking route** switches back.
 3. Our live verification returned **1608.1 m / 1157.8 s (19.3 min)** and 99 route
    vertices. Maximum waypoint adjustment was 2.99 m; Georges Quay was 0.53 m.
-   Results can change with the provider's data. The blue route followed mapped
+   Results can change with the provider's data. The pedestrian route followed mapped
    streets and south-bank quays rather than a direct diagonal across the Liffey.
 4. Read the snapping/entrance disclaimer and any provider warning. The verified
    response warned that road-access-restriction extra information was unavailable.
@@ -267,3 +267,9 @@ adventure:
 Run it alongside the existing `test_explore.py` regression. Desktop scroll/save,
 keyboard card focus, editor regeneration, mobile quick controls/full journey,
 responsive overflow and saved-route caching are checked independently.
+
+### Map progress and route legs
+
+Generate a quest and open a numbered marker. Mark it visited from the popup; its number remains visible beside a checkmark. The first unchecked stop has an orange ring and arrow. Mark stops 1 and 3 out of order: only incoming legs Start → 1 and 2 → 3 turn grey; stop 2 becomes next. Undo a visit to restore that leg's colour. Journey cards and progress must agree. Expand “Leg colours” for numbered leg labels; grey indicates a destination reported visited, never verified travel.
+
+Reopen the saved quest and check states persist. Visits, map pan/zoom and route-view toggles must not send another walking-route request (Chrome Network panel). Regeneration resets progress and invalidates the old route. Without routing, the dashed sequence remains usable. Shared mapped streets can overlap; hover a line for its leg label.

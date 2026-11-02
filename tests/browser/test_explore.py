@@ -28,7 +28,12 @@ def main():
         pending_routes = []
         result = None
         def fulfill_route(route):
-            route.fulfill(json={'status':'available','route':result['path'], 'distance_m':1608.1,'duration_s':1157.8,
+            # Extra vertices verify that legs use provider indices, not stop count.
+            source = result['path']['coordinates']
+            points = [source[0]]
+            for first, second in zip(source, source[1:]):
+                points.extend([[(a+b)/2 for a,b in zip(first, second)], second])
+            route.fulfill(json={'status':'available','route':{'type':'LineString','coordinates':points},'way_points':list(range(0,len(points),2)), 'distance_m':1608.1,'duration_s':1157.8,
                 'notice':'Mock pedestrian estimate; excludes visits. Entrances are not verified.',
                 'warnings':[], 'waypoints':[{'displacement_m':1.4}]})
         def route_reply(route):
@@ -123,7 +128,7 @@ def main():
             assert page.locator('#map path[stroke="#204a3b"]').count() == 0
             assert page.locator('#walking-summary').is_visible()
             assert '19.3 minutes' in page.locator('#walking-metrics').inner_text()
-            assert page.locator('#map path[stroke="#2267bd"]').count() == 1
+            assert page.locator('#map .route-leg').count() == 5
             click('#walking-route')
             assert page.locator('#walking-summary').is_hidden()
             assert page.locator('#map path[stroke="#204a3b"]').count() == 1
@@ -139,11 +144,37 @@ def main():
             assert page.locator('#stop-list .next-stop').count() == 1
             assert page.locator('#stop-list [aria-current="step"]').count() == 1
             assert page.locator('#stop-list .upcoming').count() == 4
+            assert page.locator('.next-pin').count() == 1
+            assert page.locator('#map .route-leg').count() == 5
+            # Popup mutations use the same API and cached route as journey controls.
+            click('#stop-list li:first-child .text-button')
+            page.wait_for_function("document.querySelectorAll('.popup-visit').length === 1")
+            page.locator('.popup-visit').click(); idle()
+            assert page.locator('.visited-pin').count() == 1
+            assert '✓' in page.locator('.visited-pin').inner_text()
+            assert page.locator('#map .route-leg-1.visited-leg').count() == 1
+            assert page.locator('#map .route-leg-2.next-leg').count() == 1
+            page.wait_for_function("document.querySelectorAll('.popup-visit').length === 1")
+            page.locator('.popup-visit').click(); idle()
+            assert page.locator('.visited-pin').count() == 0
+            assert page.locator('#map .route-leg-1.next-leg').count() == 1
+            page.wait_for_function("document.querySelectorAll('.leaflet-popup-close-button').length === 1")
+            page.locator('.leaflet-popup-close-button').click()
+            assert len(routing_calls) == 1
             # Visiting out of order must not skip the first unchecked stop.
             page.locator('#stop-list input').nth(2).check(); idle()
             assert page.locator('#next-name').inner_text() == result['stops'][0]['place']['properties']['name']
             assert page.locator('#stop-list > li').nth(2).locator('.stop-state span').last.inner_text() == 'Visited'
+            assert page.locator('#map .route-leg-3.visited-leg').count() == 1
+            assert page.locator('#map .route-leg-1.next-leg').count() == 1
+            assert page.locator('.visited-pin').count() == 1
+            page.locator('#stop-list input').first.check(); idle()
+            assert page.locator('#map .visited-leg').count() == 2
+            page.locator('#map-panel').screenshot(path='/tmp/dq-map-progress.png')
+            assert page.locator('#map .route-leg-2.next-leg').count() == 1
+            page.locator('#stop-list input').first.uncheck(); idle()
             page.locator('#stop-list input').nth(2).uncheck(); idle()
+            assert page.locator('#map .visited-leg').count() == 0
             assert len(routing_calls) == 1
             for stop in result['stops']:
                 card = page.locator(f'[data-stop-id="{stop["id"]}"]')
@@ -157,6 +188,7 @@ def main():
             assert page.locator('.focused-pin').count() == 1
             click('#stop-list li:first-child .text-button')
             assert page.locator('.leaflet-popup').is_visible()
+            page.wait_for_function("document.querySelectorAll('.leaflet-popup-close-button').length === 1")
             page.locator('.leaflet-popup-close-button').click()
 
             page.locator('#stop-list input').first.check()
@@ -177,6 +209,7 @@ def main():
             assert page.locator('#next-name').inner_text() == result['stops'][0]['place']['properties']['name']
             click('#next-map')
             assert page.locator('.leaflet-popup').is_visible()
+            page.wait_for_function("document.querySelectorAll('.leaflet-popup-close-button').length === 1")
             page.locator('.leaflet-popup-close-button').click()
 
             click('#edit-quest')
@@ -252,7 +285,7 @@ def main():
             assert page.locator('#quest-stop-count').inner_text() == '3 discoveries'
             assert '0 of 3' in page.locator('#progress-label').inner_text()
             assert page.locator('#walking-summary').is_hidden()
-            assert page.locator('#map path[stroke="#2267bd"]').count() == 0
+            assert page.locator('#map .route-leg').count() == 0
             page.wait_for_function("document.querySelector('#walking-status').textContent.includes('not configured')")
             assert page.locator('#map path[stroke="#204a3b"]').count() == 1
             assert len(routing_calls) == 3

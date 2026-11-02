@@ -39,6 +39,7 @@ class RoutingHelperTests(SimpleTestCase):
         result, opener = self.invoke(provider_data())
         self.assertEqual(result["status"], "available")
         self.assertEqual(result["route"]["coordinates"], COORDINATES)
+        self.assertEqual(result["way_points"], [0, 1, 2])
         self.assertEqual(result["distance_m"], 150)
         self.assertEqual(result["duration_s"], 110)
         self.assertTrue(all(w["displacement_m"] < .01 for w in result["waypoints"]))
@@ -52,6 +53,16 @@ class RoutingHelperTests(SimpleTestCase):
         self.assertNotIn(FAKE_KEY, json.dumps(result))
         self.assertEqual(self.path.ewkt, original)
         self.assertEqual(self.path.srid, 2157)
+
+    def test_waypoint_indices_preserve_intermediate_route_vertices(self):
+        data = provider_data()
+        geometry = data['features'][0]['geometry']
+        geometry['coordinates'].insert(1, [-6.2595, 53.3501])
+        data['features'][0]['properties']['way_points'] = [0, 2, 3]
+        result, _ = self.invoke(data)
+        self.assertEqual(result['status'], 'available')
+        self.assertEqual(result['way_points'], [0, 2, 3])
+        self.assertEqual(result['route']['coordinates'], geometry['coordinates'])
 
     @override_settings(ORS_API_KEY="")
     def test_missing_key_never_contacts_provider(self):
