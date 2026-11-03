@@ -1,6 +1,6 @@
 # DublinQuest data qualification
 
-Inspected 2 November 2026. This records qualification of the source snapshots and the implemented import rules. The Phase 2 results below distinguish imported, skipped and quarantined records; raw snapshots remain unmodified.
+Inspected 2 November 2026. This records qualification of the source snapshots and the implemented import rules. The import results below distinguish imported, skipped and quarantined records for the qualified, checksum-pinned snapshots.
 
 ## Sources and reproducibility
 
@@ -15,9 +15,9 @@ The manifest pins the four original Smart Dublin resources selected for DublinQu
 
 `data/sources.json` contains exact download/resource URLs, resource modification timestamps, SHA-256 checksums, publisher and catalogue licence fields. The catalogue's version fields are blank; the versions above describe the source filenames/notes, not invented release numbers. Recent metadata updates do not make the underlying data current. In particular the parks publisher explicitly says the 2016 mapping has not been updated.
 
-The four original data snapshots are bundled in `data/raw/` as third-party Dublin City Council open data, separate from the original DublinQuest application code. Their source licences apply independently of any application-code licence. The snapshots are unchanged, including known source defects, and included in Docker builds for future import commands. Full CKAN metadata dumps and any other files in that folder remain ignored and excluded from Docker builds. Downloaded files were parsed as GeoJSON FeatureCollections or CSV with the required headers; none was an HTML error page. Canvas is structurally readable but is not valid UTF-8 GeoJSON as supplied.
+The four original data snapshots are bundled in `data/raw/` as third-party Dublin City Council open data, separate from the original DublinQuest application code. Their source licences apply independently of any application-code licence. The bundled snapshots preserve known source defects and are included in Docker builds for the dataset import commands. Full CKAN metadata dumps and any other files in that folder remain ignored and excluded from Docker builds. Downloaded files were parsed as GeoJSON FeatureCollections or CSV with the required headers; none was an HTML error page. Canvas is structurally readable but is not valid UTF-8 GeoJSON as supplied.
 
-A fresh clone includes all four source files: no external dataset download is required. After creating the Phase 0 Docker environment, the existing script can verify their checksums locally and the inspection can be repeated:
+A fresh clone includes all four source files: no external dataset download is required. After building the Docker web image using the README setup, verify their checksums and repeat the inspection with:
 
 ```bash
 python3 scripts/download_datasets.py
@@ -33,11 +33,11 @@ The inspection script uses GeoDjango's GEOS/GDAL tools already in the web image.
 
 ## CRS and geometry checks
 
-All three GeoJSON files explicitly declare `urn:ogc:def:crs:OGC:1.3:CRS84`: WGS84 longitude, latitude. Interpret those axes correctly when transforming to the approved EPSG:2157 storage CRS. Leaflet will receive latitude, longitude arrays, while GeoJSON remains longitude, latitude.
+All three GeoJSON files explicitly declare `urn:ogc:def:crs:OGC:1.3:CRS84`: WGS84 longitude, latitude. Interpret those axes correctly when transforming to the approved EPSG:2157 storage CRS. Leaflet markers receive latitude, longitude arrays, while API GeoJSON uses longitude, latitude.
 
-The public-art CSV has named Latitude/Longitude columns and Dublin-range numeric values. Its catalogue describes latitude/longitude but does not explicitly establish the datum in the inspected metadata. EPSG:4326 is the proposed interpretation, pending corroboration or source confirmation; it is not an embedded verified CSV CRS.
+The public-art CSV has named Latitude/Longitude columns and Dublin-range numeric values. Its catalogue describes latitude/longitude but does not explicitly establish the datum in the inspected metadata. The importer explicitly uses EPSG:4326 through `--source-srid 4326` and records this interpretation in its report; publisher confirmation of the datum remains outstanding.
 
-Every nonmissing geometry parsed, was nonempty and had finite geographic coordinates within valid longitude/latitude ranges. This validates structure, not whether a marker is accurately placed or a place is publicly accessible. All point geometries are GEOS-valid. Eight park MultiPolygons are invalid due to self-intersections; see below. No source provides LineStrings: those will be generated from adventure stop sequences in a later phase.
+Every nonmissing geometry parsed, was nonempty and had finite geographic coordinates within valid longitude/latitude ranges. This validates structure, not whether a marker is accurately placed or a place is publicly accessible. All point geometries are GEOS-valid. Eight park MultiPolygons are invalid due to self-intersections; see below. No source provides LineStrings: `adventures/generation.py` creates the saved EPSG:2157 LineString from the start and ordered adventure stops. Pedestrian geometry is returned separately by openrouteservice and does not replace that saved sequence.
 
 ## Dublin Canvas
 
@@ -51,7 +51,7 @@ Fields: `Council:`, `GPS:`, `Artist:`, `Artwork title:`, `Location:`, `Area:`, `
 - `Year:` mixes single years, year ranges and whitespace; preserve as source text rather than forcing an integer.
 - Profile URLs repeat, including a shared general link; they are not reliable primary keys. Neither artwork titles nor coordinates uniquely identify all source records.
 
-Recommended initial eligibility: named DCC records with valid geometry and `1. Remain as is`; exclude painted-over/removed/grey/repaint-pending records from current attraction searches. This leaves 327 candidate rows at 322 unique points before text review and duplicate resolution. The catalogue is a May 2025 snapshot, so even that status does not verify physical presence in November 2026. Quarantine malformed text for explicit review; never silently replace all errors or reinterpret the entire mixed file as Latin-1. Keep the original bytes unchanged.
+The Canvas importer accepts named DCC records with valid geometry and `1. Remain as is`; painted-over/removed/grey/repaint-pending records are excluded from current attraction searches. This leaves 327 candidate rows at 322 unique points before text review and duplicate resolution. The catalogue is a May 2025 snapshot, so even that status does not verify physical presence in November 2026. Quarantine malformed text for explicit review; never silently replace all errors or reinterpret the entire mixed file as Latin-1. Keep the original bytes unchanged.
 
 The catalogue description mentions 898 boxes, matching nonblank property rows, rather than the 912 raw features or 874 usable geometries. These are different counts.
 
@@ -67,7 +67,7 @@ Contact postal fields describe the Dublin City Arts Office in the sample inspect
 
 Fields: `Title`, `Description`, `Address1`, `Address2`, `NaceCode`, `Region`, `DccAreaNew`, `CensusSmallArea`, `ElectoralDivision`. All 45 features have a title, description and geometry; 36 have blank `Address2`. No exact record, coordinate or normalized-title duplicates were found.
 
-The UTF-8 file already contains mojibake in titles at rows 12 and 41 (Glasnevin/St. Mobhi's and Áras an Uachtaráin). Preserve the source and make any reviewed text corrections explicit later. Valid UTF-8 alone does not establish clean text.
+The UTF-8 file already contains mojibake in titles at rows 12 and 41 (Glasnevin/St. Mobhi's and Áras an Uachtaráin). The importer quarantines the damaged titles rather than silently correcting them. Valid UTF-8 alone does not establish clean text.
 
 The supplied Trinity College Dublin point is `[-6.240971039, 53.34242192]`, with address `College Green`. It remains a positional concern identified in earlier research, not a verified entrance or corrected point. Spot-check it against an authoritative site map before offering it as the default start; an arbitrary map click remains an approved fallback. No corrected coordinate is asserted here. This dataset also includes government buildings and cemeteries, so the category should not promise that every record is an ancient monument or freely accessible visitor attraction.
 
@@ -92,9 +92,9 @@ Invalid boundary rows:
 | 468 | Edenmore Green | Ring self-intersection |
 | 540 | Church of Ireland Openspace 3 | Self-intersection |
 
-Initial recommendation: quarantine these eight rather than silently repairing boundaries. If retaining a particular park later matters, review a GEOS/PostGIS make-valid result explicitly, including geometry type and area changes. This is not required to establish sufficient coverage now.
+The park importer quarantines these eight boundaries without automatic repair. Any requalification using GEOS/PostGIS make-valid must explicitly review geometry type and area changes.
 
-For park attraction candidates, require a name and valid boundary and initially exclude institutional land and graveyards. This gives 484 candidates, without claiming verified public access. Derive a point-on-surface only when importing later, label it as a representative point rather than an entrance, and calculate areas from transformed geometry rather than trusting the source area fields as current measurements.
+The park importer requires a name and valid boundary and excludes institutional land and graveyards. It imports 484 boundaries and derives a point-on-surface for each as a quest destination, labelled as a representative point rather than an entrance. Public access is not verified. Source area attributes are not treated as current measurements; any area calculation should use projected geometry.
 
 ## Spatial functionality and coverage evidence
 
@@ -102,11 +102,11 @@ The inspection uses illustrative Dublin-centre coordinates `(-6.26, 53.35)`, not
 
 - 92 Canvas rows satisfy the named-DCC/remain-status selection before text/deduplication review.
 - 63 public artworks and 26 heritage features have source points within the radius.
-- 55 of the 484 proposed park candidates intersect the buffered search area; 51 have a representative point within the radius. Intersection and representative-point distance are intentionally different tests.
+- 55 of the 484 eligible park candidates intersect the buffered search area; 51 have a representative point within the radius. Intersection and representative-point distance are intentionally different tests.
 
-This is enough candidate density for a five-stop central adventure without inventing attractions. It is not a guarantee for every category, radius or start; sparse results must remain visible rather than widening the radius silently. Exact post-import counts will depend on the reviewed exclusions.
+This is enough candidate density for a five-stop central adventure without inventing attractions. It is not a guarantee for every category, radius or start; sparse results must remain visible rather than widening the radius silently. The completed import counts are listed under [Import results](#import-results).
 
-Containment has real positive examples: Merrion Square boundary (row 373) covers nine source public-art points; St. Patricks Park (42) covers two; Pearse Square (10) covers one. These were tested with GEOS `covers` on valid projected geometry, not yet through database queries or frontend interactions. They provide practical fixtures for later PostGIS containment demonstrations.
+Containment has real positive examples: Merrion Square boundary (row 373) covers nine source public-art points; St. Patricks Park (42) covers two; Pearse Square (10) covers one. Initial qualification used GEOS `covers` on valid projected geometry. The application now exposes boundary-inclusive containment through PostGIS `ST_CoveredBy` and the Leaflet interface’s Find places inside a park interaction. Merrion Square returns nine public artworks; see [API examples](API.md#manual-testing-guide--places-and-parks).
 
 There are no exact normalized-name matches between the three point datasets. Five cross-source pairs lie within 20 metres, but their names indicate different objects (for example a Canvas box near Thomas Moore Statue). Proximity alone is not evidence that records should be merged. Review any future park/heritage representative-place overlap separately.
 
@@ -118,16 +118,16 @@ Keep the supplied attribution, dataset title, publisher, resource link and licen
 
 The bundled raw snapshots are unmodified. Imported copies are filtered and transformed in PostGIS. Attribution for these snapshots: “Dublin City Council open data via Smart Dublin: Dublin Canvas Public Art (2025), Public Artworks DCC (2021), Heritage Sites, Historic Monuments and Government Buildings (2024), and Parks and Open Spaces DCC (2016). Creative Commons Attribution.” The table above links each source; the publisher licence notice is retained above and in `data/sources.json`. Artist credits remain in the Canvas data. No photographs or external images are included.
 
-Attribution text for the processed application data: “Contains Dublin City Council open data from Smart Dublin: Dublin Canvas Public Art (2025), Public Artworks DCC (2021), Heritage Sites, Historic Monuments and Government Buildings (2024), and Parks and Open Spaces DCC (2016), published under Creative Commons Attribution. Data filtered and transformed for DublinQuest.” Link each title and the supplied licence notice in the eventual application. Do not imply endorsement. Dataset availability does not establish rights to download/rehost linked artwork photographs; no images were downloaded.
+Attribution text for the processed application data: “Contains Dublin City Council open data from Smart Dublin: Dublin Canvas Public Art (2025), Public Artworks DCC (2021), Heritage Sites, Historic Monuments and Government Buildings (2024), and Parks and Open Spaces DCC (2016), published under Creative Commons Attribution. Data filtered and transformed for DublinQuest.” The application displays dataset attribution and links to source/licence information. Do not imply endorsement. Dataset availability does not establish rights to download/rehost linked artwork photographs; no images were downloaded.
 
 ## Comparison and remaining checks
 
-Counts, bytes, geometry types, Canvas null geometry and the Trinity positional concern match the earlier research. Old snapshot checksums were not retained, so byte-for-byte identity with Windows originals cannot be proved. Newly established findings include eight invalid park boundaries, detailed duplicate groups, status-qualified Canvas coverage and heritage mojibake. No original files were changed.
+Counts, bytes, geometry types, Canvas null geometry and the Trinity positional concern match the earlier research. Old snapshot checksums were not retained, so byte-for-byte identity with Windows originals cannot be proved. The qualification identified eight invalid park boundaries, detailed duplicate groups, status-qualified Canvas coverage and heritage mojibake. Qualification did not change the original files.
 
 Quarantined Canvas/heritage records can be reconsidered after explicit text/location review; corroborating the CSV datum and retaining the licence-version uncertainty remain important. No geographic-accuracy audit of every attraction, access survey, source area reconciliation, live artwork-profile validation or image-rights review has been performed. The management commands implement the exclusions below without silently correcting source data.
 
 
-## Phase 2 import results
+## Import results
 
 Each command uses `BaseCommand`, conventional GeoDjango geometry operations, `full_clean()` and source-keyed saves, following the labs' management-command loading approach. A small shared helper contains checksum/provenance, validation and report formatting; there is no import framework or background worker. Display names/descriptions and URLs have surrounding whitespace trimmed; no geographic coordinates or damaged text are silently corrected. Each dataset is one atomic database transaction. Unexpected failures roll back the dataset; deliberately rejected records are reported and omitted. Park and representative-Place writes also use a savepoint so a validation failure cannot leave half a pair.
 

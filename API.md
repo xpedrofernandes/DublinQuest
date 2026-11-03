@@ -54,7 +54,7 @@ These are three independently callable, meaningful spatial queries for the assig
 
 EXPLAIN checks against the imported data on 2 November 2026 showed bitmap index scans on the Place point GiST index for 1 km proximity (93 matches) and Merrion containment (9), and on the Park boundary GiST index for 1 km intersection (27). Exact filters follow the index bounding-box prefilter. Distance sorting still needs a sort. Plans depend on table statistics/radius; do not claim every query must use an index or that these counts are a performance benchmark.
 
-## Manual testing guide — places/parks milestone
+## Manual testing guide — places and parks
 
 After rebuilding/applying migrations (`docker compose build web`, `docker compose run --rm web python manage.py migrate --noinput`, `docker compose up -d --wait web`), use an anonymous/private browser window for these baseline reads. Counts assume the qualified data before manual edits.
 
@@ -74,7 +74,7 @@ After rebuilding/applying migrations (`docker compose build web`, `docker compos
 | `http://localhost:8000/api/places/?categories=unknown&format=json` | 400, category validation error |
 | `http://localhost:8000/api/places/?page_size=101&format=json` | 400, page-size validation error |
 
-Verify Feature coordinates look like longitude -6.x / latitude 53.x, distances increase, `features` is an array, and following `next` gives another page. Individual place/park IDs can be followed through their detail URLs. An empty valid search is 200 with count 0 and features [], not a server error. These checks do not yet draw a Leaflet map.
+Verify Feature coordinates look like longitude -6.x / latitude 53.x, distances increase, `features` is an array, and following `next` gives another page. Individual place/park IDs can be followed through their detail URLs. An empty valid search is 200 with count 0 and features [], not a server error. These requests inspect API responses directly; the Leaflet interface at `/` displays the same spatial data.
 
 An anonymous write must fail before creating anything:
 
@@ -142,7 +142,7 @@ Progress uses actual saved stop count: `{"visited":1,"total":5,"percent":20.0,"c
 
 It reserves the nearest candidate of each available category; if there are fewer requested slots than categories, categories with nearer representatives win. Remaining slots take the nearest unused candidates. It then orders at most ten selected places using a simple greedy nearest-next distance, with PK tie-breaking. The starting point and ordered stop coordinates form the stored LineString; PostGIS constructs the stored search buffer. Identical criteria and unchanged database records give the same stop selection/order, independent of category-input order or session identity. This is understandable category variety plus proximity, not optimal route planning, walking navigation, travel time or access verification. Distances from the origin need not increase along the nearest-next sequence.
 
-No new models or dependencies were introduced. Search radius applies to distance from the start, not to total sequence length. Geometry/distances describe generation time; related Place metadata is live. If staff later move a source Place, regenerate the adventure to refresh its sequence/distances. The saved LineString is not silently rewritten by staff place edits. Park representative points remain explicitly labelled as not verified entrances.
+Search radius applies to distance from the start, not to total sequence length. Geometry/distances describe generation time; related Place metadata is live. If staff later move a source Place, regenerate the adventure to refresh its sequence/distances. The saved LineString is not silently rewritten by staff place edits. Park representative points remain explicitly labelled as not verified entrances.
 
 Sessions persist across requests/container restarts using the existing database volume. Two tabs sharing the session share adventures. Clearing browser cookies, session expiry, Django logout (which flushes the session), or switching browser profiles loses access; there is no account recovery or cross-browser sharing in this scope. CSRF bootstrap must be repeated after a login rotates its token. There is no separate unsaved preview endpoint: POST generation saves immediately.
 
@@ -193,7 +193,7 @@ await dqQuestApi(`/api/adventures/${dqAdventure.id}/`);
 await dqQuestApi(`/api/adventures/${dqAdventure.id}/stops/${dqAdventure.stops[0].id}/`, 'PATCH', {visited: false});
 ```
 
-Expected progress 1/5 (20%) then 0/5, with visited_at populated then cleared. Mark all five visited to see complete=true and 100%; this is the backend completion state, not a graphical completion screen yet.
+Expected progress 1/5 (20%) then 0/5, with visited_at populated then cleared. Mark all five visited to see complete=true and 100%; the Leaflet interface shows the Quest complete panel for this saved completion state.
 
 Rename without resetting progress, then regenerate with explicit reset confirmation:
 
@@ -223,17 +223,19 @@ Expected HTTP 204 and no deleted UUID in the list; its retrieval URL now returns
 
 The Leaflet map, numbered markers, radius/sequence overlays, builder form, stop cards and visible progress/completion are available at `/`. This console guide remains useful for testing the backend independently; see [FRONTEND_TESTING.md](FRONTEND_TESTING.md) to use the interface.
 
-## Optional pedestrian route
+## Pedestrian route
 
 `POST /api/adventures/{uuid}/walking-route/` with `{}` (or an empty body) requests
-one `foot-walking` route through the saved origin and ordered stops. Use the same
+one `foot-walking` route through the saved origin and ordered stops. A valid key
+from [HeiGIT Account](https://account.heigit.org/) is required for the intended
+walking-route experience; see [README setup](README.md#running-locally). Use the same
 session cookies and `X-CSRFToken` header as other guest mutations. Foreign owners
 get 404; missing CSRF gets 403; GET is not supported. Client coordinates, profiles,
 provider URLs and keys are not accepted. Source places moved since generation
 require regeneration before routing.
 
 The server uses `https://api.heigit.org/openrouteservice/v2/directions/foot-walking/geojson`
-with the optional server-side `ORS_API_KEY`, a 10-second network timeout, six
+with a server-side `ORS_API_KEY` required for pedestrian routing, a 10-second network timeout, six
 waypoints for a five-stop adventure, and a 50 m maximum snapping radius per point.
 There is no optimization, automatic retry, provider switching or redirect following.
 No original geometry, stop order, progress or model is changed.
@@ -263,7 +265,9 @@ straight-line measurements.
 
 Missing configuration, provider errors/limits, timeout, excessive snapping or an
 invalid response return HTTP 200 with `status: "unavailable"` and a safe `detail`
-message. The adventure remains usable with its original dashed sequence. Provider
+message. The adventure remains usable with its original dashed sequence. That
+fallback does not follow walkable streets and its straight-line distances must not
+be presented as walking distance or duration. Provider
 error text, metadata and credentials are never forwarded. A best-effort per-session
 30-second cooldown limits repeated requests; it is not a global quota or abuse
 prevention system. All adventure responses retain private/no-store caching.
@@ -276,7 +280,7 @@ Switching adventures clears the visible overlay; regeneration or changed stops
 invalidate that adventure’s cache. Late responses cannot overwrite another
 generation. Failures are cached too; reload or regenerate later to retry.
 Reloading discards the cache and opening a saved adventure starts a new automatic
-request. Routes are not persisted to PostgreSQL. The backend cooldown is unchanged.
+request. Routes are not persisted to PostgreSQL. The 30-second session cooldown also applies after a page reload.
 
 The current URL follows the provider's
 [HeiGIT migration](https://ask.openrouteservice.org/t/deprecating-api-openrouteservice-org-in-favour-of-api-heigit-org/7912).

@@ -2,7 +2,7 @@
 
 ### Explore Dublin Your Way
 
-DublinQuest is a location-based exploration app I'm developing for CMPU4058 — Advanced Web Mapping at TU Dublin. The idea is to help people discover Dublin through its street art, historic landmarks, public artworks and parks.
+DublinQuest is a location-based exploration app for CMPU4058 — Advanced Web Mapping at TU Dublin. The idea is to help people discover Dublin through its street art, historic landmarks, public artworks and parks.
 
 Instead of following a fixed tour, you choose where to start, what interests you, how far to explore and how many places to visit. DublinQuest uses those choices to put together an adventure on an interactive map.
 
@@ -13,21 +13,15 @@ Instead of following a fixed tour, you choose where to start, what interests you
 3. Explore the suggested stops using the map and an ordered list of places.
 4. Follow your quest journey, mark stops as visited and keep track of your progress.
 
-Visited markers show an emerald checkmark; the next marker has an orange ring and arrow. Marker popups also let you mark or undo a visit. Incoming walking-route legs have distinct colours and turn grey when their destination is marked visited, without another routing request. Expand **Leg colours** in the journey for numbered labels. Shared mapped sections can overlap visually.
+The map shows your start, search area and numbered destinations alongside an
+ordered quest journey. Mark stops visited to update your progress; completion is
+self-reported, not GPS-verified. See [Your first adventure](#your-first-adventure)
+for the controls and mobile layout.
 
-The next discovery is the first stop you have not marked visited. Journey cards and numbered map markers
-distinguish Next stop, Upcoming and Visited; completing the checklist reveals a
-Quest complete panel. Progress is self-reported, not verified by GPS.
-
-After generation, the journey replaces the builder beside the map on desktop and
-scrolls independently. On mobile, a compact next-stop panel provides visit/undo
-actions beneath the map and opens the full journey when needed. **Edit quest**
-returns to the existing builder; apply edits with regeneration, or return to the
-saved quest without applying them.
-
-The map shows the starting point, search area, numbered stops and a suggested sequence connecting them. Each stop includes a description, category and distance information.
-
-The dashed connecting lines show the suggested exploration order and straight-line distances. An estimated pedestrian route from openrouteservice/HeiGIT loads automatically when available; it leaves the original sequence and stop order unchanged. A simple control switches between walking and straight-line views. Walking times exclude visits, and entrances/current access are not verified.
+**A valid HeiGIT/openrouteservice key is required for pedestrian routes, walking
+distances and estimated durations.** Without a successful routing response, the
+app shows a straight-line sequence instead. See [Pedestrian routing](#pedestrian-routing)
+for setup requirements and fallback limitations.
 
 ## Web mapping
 
@@ -51,9 +45,10 @@ Adventures and visited stops are saved for the same browser, without requiring a
 
 ## Scope
 
-The initial version focuses on spatial searches, interactive mapping and a complete exploration flow. It won't include live GPS tracking, turn-by-turn navigation or an AI assistant.
-
-The application includes an interactive Leaflet map, adventure builder, saved guest adventures and visited-stop progress. The three spatial searches can also be used independently through the interface.
+The project focuses on spatial searches, interactive mapping and a complete
+exploration flow. The three spatial searches can be demonstrated independently of
+quest generation. Live GPS tracking, turn-by-turn navigation and AI are outside
+the project scope.
 
 ## Running locally
 
@@ -62,6 +57,10 @@ This guide starts from a fresh clone and an empty database volume. Docker Deskto
 No host Python, PostgreSQL or GIS installation is needed. Allow ports **8000** and
 **5050**; internet access is needed for the initial build and OpenStreetMap tiles.
 The four source datasets are already bundled in the repository.
+
+I tested the fresh-clone setup on both macOS and Windows. On Windows, I used
+Docker Desktop with its WSL2 backend. Run the guide from the project folder,
+using the PowerShell alternatives where shown.
 
 ### 1. Clone the repository
 
@@ -79,6 +78,12 @@ If using the ZIP instead, extract it and open a terminal in the folder containin
 cp .env.example .env
 ```
 
+In Windows PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
 Edit `.env` before starting containers:
 
 - Replace every `change-me` value: `POSTGRES_PASSWORD`, `DATABASE_PASSWORD`,
@@ -88,15 +93,43 @@ Edit `.env` before starting containers:
   `postgres` (administrator) and `dublinquest` (restricted application account).
 - Keep `DJANGO_DEBUG=False` and the default localhost allowed hosts for this setup.
 - `PGADMIN_DEFAULT_EMAIL` is the pgAdmin login name; set it to your preferred email.
-- Leave **`ORS_API_KEY=` blank** unless you want optional pedestrian routes.
-  **DublinQuest works without a routing key:** generating/saving quests, spatial
-  searches and visit progress all work with the dashed straight-line sequence.
-  That sequence is not walking directions. See [Optional walking routes](#optional-walking-routes).
+- Configure **`ORS_API_KEY` for the intended pedestrian-routing experience** using
+  the steps below. Leaving it blank permits core use with straight-line fallback,
+  without pedestrian directions or walking estimates.
 - Keep `DOCKER_SUBNET=172.28.40.0/24` unless it conflicts with another local network;
   choose a non-overlapping subnet before first startup if necessary.
 
 Keep `.env` private. It is excluded from Git, the Docker build context and the
 submission archive. Never replace `.env.example` with your real credentials.
+
+If OpenSSL is unavailable on Windows, generate a random secret in PowerShell
+(run again for each value):
+
+```powershell
+$bytes = New-Object byte[] 32
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes)
+[BitConverter]::ToString($bytes).Replace('-', '').ToLowerInvariant()
+$rng.Dispose()
+```
+
+To obtain and configure the routing key:
+
+1. Register or sign in at [HeiGIT Account](https://account.heigit.org/).
+2. Open your account dashboard and copy your API key with openrouteservice access.
+   The [HeiGIT API page](https://api.heigit.org/) links to registration and the dashboard.
+3. In the local **root `.env` file**, alongside `docker-compose.yml`, set:
+
+   ```dotenv
+   ORS_API_KEY=your_key_here
+   ```
+
+   Replace `your_key_here` with your own key. Keep the value in `.env.example` blank.
+   Django uses this credential on the server; it is not sent to frontend JavaScript.
+
+Continue with Docker setup below. If you add or change the key after starting the
+application, run `docker compose up -d --wait web` to apply it. For automatic
+loading, fallback and caching behaviour, see [Pedestrian routing](#pedestrian-routing).
 
 ### 3. Build the web image, start PostGIS and apply migrations
 
@@ -122,6 +155,14 @@ docker compose run --rm -T web python manage.py import_public_art --source-srid 
 docker compose run --rm -T web python manage.py import_heritage > data/import-reports/heritage.json
 docker compose run --rm -T web python manage.py import_parks > data/import-reports/parks.json
 ```
+
+In PowerShell, replace the `mkdir -p` line with:
+
+```powershell
+New-Item -ItemType Directory -Force -Path data/import-reports | Out-Null
+```
+
+Run the same four `docker compose` import commands afterwards.
 
 Each command writes its results to the corresponding local JSON report. No
 external dataset downloads are required. The public-art command requires
@@ -241,40 +282,58 @@ Public GeoJSON endpoints provide place/park listings, category filters, proximit
 
 ## Your first adventure
 
-Guest sessions can now generate/save adventures, retrieve them, mark stops visited, regenerate their straight-line sequence and delete them. No visitor account is needed. The algorithm selects real nearby places with category variety and a deterministic nearest-next order; it does not calculate walking routes. Open http://localhost:8000/, search for **Thomas Moore**, choose the result near College Green, leave the four categories selected, and generate five stops within 2 km. Adventures save automatically. Use the visited checkboxes and the saved-adventure cards to continue later. Regeneration applies the current builder settings and resets progress after confirmation. The dashed sequence is a straight connection; the optional solid pedestrian overlay is requested separately in the background.
+1. Open http://localhost:8000/ and search for **Thomas Moore**, select a popular
+   starting point, or click the map. Autocomplete searches imported names only;
+   popular shortcuts are separate reference coordinates, not verified entrances.
+2. Choose categories, radius and stop count, then build a quest. It saves
+   automatically in this browser without an account.
+3. Use the map and journey together. Desktop has an independently scrollable
+   journey beside the map; mobile places next-stop visit/undo controls below the
+   map, with access to the full journey.
+4. Mark or undo visits from cards or marker popups. Visited markers retain their
+   number with an emerald checkmark; the first unvisited stop has an orange ring
+   and arrow. Cards distinguish Next stop, Upcoming and Visited. When all stops
+   are marked visited, the Quest complete panel appears.
+5. Reopen a quest from Saved adventures to continue. **Edit quest** returns to the
+   builder; regeneration applies changes and resets progress after confirmation.
+   You can return without applying edits, rename the quest or delete it.
+
+For walking routes, leg colours and caching, see [Pedestrian routing](#pedestrian-routing).
 
 The interface uses local Leaflet 1.9.4 and Bootstrap 5.3.8 assets; no frontend build system is required. OpenStreetMap tiles need internet access. Django sends `Referrer-Policy: strict-origin-when-cross-origin` so tile requests identify the application origin without exposing page paths or query strings; normal browser tile caching is preserved. Scroll-wheel map zoom is disabled to make page scrolling easier; use the map zoom controls, keyboard or touch gestures. A place search provides an alternative to choosing a start by clicking the map.
 
 See [FRONTEND_TESTING.md](FRONTEND_TESTING.md) for the full interface walkthrough, or [API.md](API.md#manual-guide-generate-your-first-adventure) to exercise the underlying APIs directly.
 
-## Optional walking routes
+## Pedestrian routing
 
-The core application needs no routing account. To enable the optional pedestrian
-overlay, obtain a personal key from [HeiGIT](https://account.heigit.org/signup),
-set `ORS_API_KEY` in the ignored root `.env`, and recreate the web container:
+Walking routes and estimated walking distance/duration require a valid
+`ORS_API_KEY` and access to the HeiGIT service. Follow the key setup in
+[Running locally](#running-locally). The core application can still generate/save
+quests, run spatial searches and record visits without this credential.
 
-```bash
-docker compose up -d --wait web
-```
+Django keeps the key server-side and sends the ordered start/stop coordinates to
+HeiGIT. After generation or opening a saved quest, a loading indicator appears
+while routing runs in the background; the map and controls remain usable.
 
-The key is used exclusively by Django, never JavaScript. Requests send only the
-ordered waypoint coordinates and routing options to HeiGIT. Walking routes load in the background after generating or opening an adventure;
-stops and controls remain usable while a loading indicator is shown. The solid
-coloured walking route becomes the primary view, with estimated walking distance/time. Use
-**View straight-line sequence** to compare the original geometry without another
-request. Provider
-errors, missing configuration or unroutable points fall back without affecting
-saved adventures. Completed and pending results are reused in page memory, including when
-reopening saved adventures. Progress updates, map controls and view toggles do not
-request routes again. Regeneration or changed stops invalidate the cached result.
-Failures are also reused for the page lifetime; reload or regenerate later to retry.
-No key is required to use the straight-line fallback. See [FRONTEND_TESTING.md](FRONTEND_TESTING.md#optional-walking-route)
-and [API.md](API.md#optional-pedestrian-route).
+A successful response displays a solid pedestrian route with estimated walking
+distance/time and hides the dashed sequence. Incoming legs have distinct colours;
+a leg turns grey when its destination is marked visited. **Leg colours** lists
+numbered legs, and **View straight-line sequence** switches views. Times exclude
+visits; source markers stay in place and access/entrances are not verified. Shared
+streets can cause legs to overlap visually.
 
-Starting-place autocomplete searches the imported database only; it is not an
-address geocoder. Three separately labelled popular starting points use published
-reference coordinates and are not verified entrances or extra destinations. Their
-sources are recorded in [DATA_SOURCES.md](DATA_SOURCES.md#popular-starting-point-shortcuts-ui-constants-only).
+Pending results, successful routes and failures are cached in page memory.
+Progress updates, pan/zoom, view toggles and reopening a cached quest do not
+request routing again. Regeneration or changed stops invalidate the cache;
+reloading the page clears it. A 30-second server-side session cooldown limits
+requests. Reload or regenerate later to retry a cached failure.
+
+Missing/invalid credentials, provider errors or unroutable points automatically
+restore the dashed sequence without affecting saved quests. This fallback joins
+stops directly, regardless of roads, rivers or access: its distances are
+straight-line measurements, not walking distances, and it provides no walking
+duration. See [routing tests](FRONTEND_TESTING.md#walking-route-verification) and
+[API details](API.md#pedestrian-route).
 
 ## Project documentation
 
@@ -297,9 +356,8 @@ no routing geometry or background tiles are mocked in these screenshots.
 ### Limitations
 
 - Imported data is historical. Invalid/ambiguous records are quarantined, not silently repaired. The public-art CSV datum is an explicit WGS84 interpretation; dataset licence metadata does not identify a specific CC BY version.
-- Popular starting points are approximate references, not verified entrances. Search covers imported names, not arbitrary addresses.
 - Guest access depends on the browser session cookie (Django's default expiry is two weeks); clearing or losing it removes access to those quests. The database records are not transferred between browsers.
 - Radius measures distance from the start, not total walking distance. Stop order is deterministic and greedy, not an optimal pedestrian tour.
-- ORS needs an optional private key and internet access. Results/failures are cached only in page memory; provider requests have a 30-second session cooldown. Reloading can issue another request. Routes and visit claims do not verify access, entrances or physical presence.
+- Walking routes depend on ORS credentials, service availability and mapped access. The [routing section](#pedestrian-routing) explains caching and the straight-line fallback; neither routes nor visit claims verify physical presence.
 - OSM imagery and Swagger UI assets need internet access. The normal interface assets and datasets are bundled. No offline tile download is provided.
 - This Docker setup is verified for local loopback HTTP. Public cloud hosting and HTTPS are not deployed; see [Checks and troubleshooting](#checks-and-troubleshooting) for the security limitations.

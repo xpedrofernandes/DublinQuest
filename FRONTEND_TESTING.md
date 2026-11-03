@@ -154,12 +154,16 @@ parameters, spoof headers, proxy requests to evade restrictions, prefetch tiles,
 or run automated real-tile pan/zoom scans. See the official
 [OSMF Tile Usage Policy](https://operations.osmfoundation.org/policies/tiles/).
 
-## Optional walking route
+## Walking-route verification
 
-This feature requires your own HeiGIT/openrouteservice key. Set `ORS_API_KEY` in
-the ignored root `.env`, then run `docker compose up -d --wait web` so the container
-receives it. Do not print resolved Compose configuration or share `.env`. With the
-key blank, the complete original adventure experience remains available.
+The intended pedestrian-routing experience requires a valid HeiGIT/openrouteservice
+key for street-following routes, walking distances and estimated durations. Follow
+the [README key setup](README.md#running-locally), set `ORS_API_KEY` in the ignored
+root `.env`, then run `docker compose up -d --wait web` so the container receives it.
+Do not print resolved Compose configuration or share `.env`. With the key blank or
+routing unavailable, quest generation, saving and progress still work, but only
+straight-line connections are shown: these are not walking directions or reliable
+walking distance/time estimates.
 
 1. Generate the five-stop Thomas Moore/College Green example described above.
 2. The stops and dashed fallback appear immediately, while **Calculating walking
