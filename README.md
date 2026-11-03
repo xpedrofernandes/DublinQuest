@@ -345,9 +345,9 @@ duration. See [routing tests](FRONTEND_TESTING.md#walking-route-verification) an
 
 ### Current application screenshots
 
-These captures show the real application, real OpenStreetMap tiles and the no-key
-straight-line fallback on a clean local installation. Two stops are marked visited;
-no routing geometry or background tiles are mocked in these screenshots.
+These captures show the real application and OpenStreetMap tiles. The desktop
+capture shows a pedestrian route with walking estimates; the tablet and mobile
+captures show the straight-line fallback with two stops marked visited.
 
 ![Desktop quest journey alongside the interactive Dublin map](screenshots/desktop.png)
 ![Tablet view with independently scrollable journey](screenshots/tablet.png)
